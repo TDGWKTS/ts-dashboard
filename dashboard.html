@@ -55,46 +55,61 @@
         </div>
         
         <div class="main-content">
-            <header class="header">
-                <div class="filter-section">
-                    <div class="filter-group">
-                        <label>日期範圍:</label>
-                        <select id="dateRangeFilter">
-                            <option value="1month">1 個月</option>
-                            <option value="3months">3 個月</option>
-                            <option value="6months">6 個月</option>
-                            <option value="1year" selected>1 年</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>廢物類別:</label>
-                        <select id="wasteCategoryFilter">
-                            <option value="">所有類別</option>
-                            <option value="P01.00">P01.00</option>
-                            <option value="P05.00">P05.00</option>
-                            <option value="D01.00">D01.00</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>來源地區:</label>
-                        <select id="sourceFilter">
-                            <option value="">所有地區</option>
-                            <option value="葵青區">葵青區</option>
-                            <option value="深水埗區">深水埗區</option>
-                            <option value="灣仔區">灣仔區</option>
-                            <option value="荃灣區">荃灣區</option>
-                            <option value="觀塘區">觀塘區</option>
-                        </select>
-                    </div>
-                    <button id="applyFilters" class="filter-btn">應用篩選</button>
-                    <button id="compareBtn" class="filter-btn secondary hidden">比較所有轉運站</button>
-                </div>
-                
-                <div class="user-section">
-                    <span id="currentUser"></span>
-                    <button id="logout" class="logout-btn">登出</button>
-                </div>
-            </header>
+           <header class="header">
+    <div class="filter-section">
+        <div class="filter-group">
+            <label>日期範圍:</label>
+            <select id="dateRangeFilter">
+                <option value="currentQuarter">本季度</option>
+                <option value="firstQuarter" selected>第一季度 (1月-3月)</option>
+                <option value="secondQuarter">第二季度 (4月-6月)</option>
+                <option value="thirdQuarter">第三季度 (7月-9月)</option>
+                <option value="fourthQuarter">第四季度 (10月-12月)</option>
+                <option value="firstHalf">上半年 (1月-6月)</option>
+                <option value="secondHalf">下半年 (7月-12月)</option>
+                <option value="1year">全年</option>
+                <option value="custom">自訂日期範圍</option>
+                <option value="specificDate">指定單一日期</option>
+            </select>
+        </div>
+        
+        <!-- Custom Date Range Selector (Hidden by default) -->
+        <div class="filter-group custom-date-range hidden" id="customDateRange">
+            <label>自訂範圍:</label>
+            <input type="date" id="startDate" class="date-input">
+            <span>至</span>
+            <input type="date" id="endDate" class="date-input">
+        </div>
+        
+        <!-- Specific Date Selector (Hidden by default) -->
+        <div class="filter-group specific-date hidden" id="specificDateSelector">
+            <label>指定日期:</label>
+            <input type="date" id="specificDate" class="date-input">
+        </div>
+        
+        <div class="filter-group">
+            <label>廢物類別:</label>
+            <select id="wasteCategoryFilter">
+                <option value="">所有類別</option>
+                <!-- Dynamic options will be loaded here -->
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>來源地區:</label>
+            <select id="sourceFilter">
+                <option value="">所有地區</option>
+                <!-- Dynamic options will be loaded here -->
+            </select>
+        </div>
+        <button id="applyFilters" class="filter-btn">應用篩選</button>
+        <button id="compareBtn" class="filter-btn secondary hidden">比較所有轉運站</button>
+    </div>
+    
+    <div class="user-section">
+        <span id="currentUser"></span>
+        <button id="logout" class="logout-btn">登出</button>
+    </div>
+</header>
             
             <main class="content-area">
                 <!-- Loading Indicator -->
@@ -189,3 +204,4 @@
     </script>
 </body>
 </html>
+
