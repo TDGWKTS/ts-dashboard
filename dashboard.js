@@ -287,7 +287,98 @@ class Dashboard {
         window.location.href = 'index.html';
     }
 }
+class Dashboard {
+    // ... existing code ...
 
+    async init() {
+        try {
+            await this.loadTSConfig();
+            await this.loadDynamicFilters(); // Load dynamic filter options
+            this.setupUI();
+            this.setupEventListeners();
+            this.loadNavigation();
+            this.initMobileNavigation();
+            
+            if (this.isAdmin) {
+                this.setupComparisonFilters();
+            }
+            
+            this.autoSelectStation();
+            
+        } catch (error) {
+            console.error('Dashboard initialization failed:', error);
+        }
+    }
+
+    async loadDynamicFilters() {
+        try {
+            // Try to load from API first
+            const response = await fetch(`${API_URL}?action=getFilterOptions`);
+            
+            if (response.ok) {
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.populateDynamicFilters(result.data);
+                    return;
+                }
+            }
+        } catch (error) {
+            console.warn('API load failed, using demo filters:', error);
+        }
+        
+        // Fallback to demo data
+        await this.loadDemoFilters();
+    }
+
+    populateDynamicFilters(data) {
+        // Populate Waste Category filter
+        const wasteCategoryFilter = document.getElementById('wasteCategoryFilter');
+        if (wasteCategoryFilter && data.wasteCategories) {
+            wasteCategoryFilter.innerHTML = '<option value="">所有類別</option>' +
+                data.wasteCategories.map(category => 
+                    `<option value="${category}">${category}</option>`
+                ).join('');
+        }
+
+        // Populate Source Region filter
+        const sourceFilter = document.getElementById('sourceFilter');
+        if (sourceFilter && data.sourceRegions) {
+            sourceFilter.innerHTML = '<option value="">所有地區</option>' +
+                data.sourceRegions.map(region => 
+                    `<option value="${region}">${region}</option>`
+                ).join('');
+        }
+
+        console.log('Dynamic filters loaded:', data);
+    }
+
+    async loadDemoFilters() {
+        // Realistic Hong Kong waste data
+        const demoFilterData = {
+            wasteCategories: [
+                'P01.00 - 都市固體廢物',
+                'P05.00 - 建築廢料', 
+                'D01.00 - 危險廢物',
+                'C01.00 - 商業廢物',
+                'C02.00 - 工業廢物',
+                'M01.00 - 混合廢物',
+                'O01.00 - 有機廢物',
+                'G01.00 - 園林廢物',
+                'R01.00 - 可回收物',
+                'F01.00 - 食物廢物'
+            ],
+            sourceRegions: [
+                '中西區', '灣仔區', '東區', '南區',
+                '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
+                '葵青區', '荃灣區', '屯門區', '元朗區', '北區',
+                '大埔區', '沙田區', '西貢區', '離島區'
+            ]
+        };
+        
+        this.populateDynamicFilters(demoFilterData);
+    }
+}
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     const currentUser = localStorage.getItem('ts_user');
@@ -297,3 +388,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.dashboard = new Dashboard();
 });
+
