@@ -1,6 +1,6 @@
-﻿[build]
+[build]
   publish = "."
-  command = "echo 'Building static site'"
+  command = "echo 'Static site build'"
 
 [[redirects]]
   from = "/*"
