@@ -1,4 +1,4 @@
-// dashboard.js - Complete Revised Version with Checkbox Filters
+// dashboard.js - Clean Version with Real API Integration Only
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -181,20 +181,11 @@ class Dashboard {
                 this.tsConfig = data.stations;
                 console.log('TS Config loaded successfully from API:', this.tsConfig);
             } else {
-                throw new Error('Invalid station configuration received');
+                throw new Error('No station configuration received from API');
             }
         } catch (error) {
-            console.error('Error loading TS config from API, using fallback:', error);
-            // Fallback to demo configuration
-            this.tsConfig = {
-                'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
-                'IWTS': { name: '港島西轉運站', color: '#4ECDC4', isAdmin: false },
-                'NLTS': { name: '北大嶼山轉運站', color: '#45B7D1', isAdmin: false },
-                'NWNNTS': { name: '西北新界轉運站', color: '#96CEB4', isAdmin: false },
-                'OITF': { name: '離島轉運設施', color: '#FFEAA7', isAdmin: false },
-                'STTS': { name: '沙田轉運站', color: '#DDA0DD', isAdmin: false },
-                'WKTS': { name: '西九龍轉運站', color: '#98D8C8', isAdmin: true }
-            };
+            console.error('Error loading TS config from API:', error);
+            this.showError('加載轉運站配置失敗: ' + error.message);
         }
     }
 
@@ -202,7 +193,6 @@ class Dashboard {
         try {
             console.log('Loading dynamic filters from GAS API...');
             
-            // Try to get real filter data from API
             const filterData = await this.fetchFromAPI('', { 
                 action: 'getFilterOptions' 
             });
@@ -213,46 +203,12 @@ class Dashboard {
                 console.log('Using real filter data from API');
                 this.populateDynamicFilters(filterData);
             } else {
-                console.log('No filter data from API, using mock data');
-                // Use mock data as fallback
-                const mockFilterData = {
-                    wasteCategories: [
-                        'P01.00 - 都市固體廢物',
-                        'P05.00 - 建築廢料', 
-                        'D01.00 - 危險廢物',
-                        'C01.00 - 商業廢物',
-                        'C02.00 - 工業廢物',
-                        'M01.00 - 混合廢物'
-                    ],
-                    sourceRegions: [
-                        '中西區', '灣仔區', '東區', '南區',
-                        '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
-                        '葵青區', '荃灣區', '屯門區', '元朗區'
-                    ]
-                };
-                this.populateDynamicFilters(mockFilterData);
+                throw new Error('No filter data received from API');
             }
             
         } catch (error) {
             console.error('Error loading dynamic filters from GAS:', error);
-            // Fallback to mock data
-            console.log('Using fallback mock filter data due to error');
-            const mockFilterData = {
-                wasteCategories: [
-                    'P01.00 - 都市固體廢物',
-                    'P05.00 - 建築廢料', 
-                    'D01.00 - 危險廢物',
-                    'C01.00 - 商業廢物',
-                    'C02.00 - 工業廢物',
-                    'M01.00 - 混合廢物'
-                ],
-                sourceRegions: [
-                    '中西區', '灣仔區', '東區', '南區',
-                    '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
-                    '葵青區', '荃灣區', '屯門區', '元朗區'
-                ]
-            };
-            this.populateDynamicFilters(mockFilterData);
+            this.showError('加載篩選選項失敗: ' + error.message);
         }
     }
 
@@ -799,10 +755,6 @@ class Dashboard {
         } catch (error) {
             console.error('Error loading single TS data:', error);
             this.showError('加載數據失敗: ' + error.message);
-            
-            // Fallback to mock data for demo purposes
-            console.log('Using fallback mock data');
-            await this.loadMockSingleTSData(filters, page);
         } finally {
             this.showLoading(false);
         }
@@ -827,10 +779,6 @@ class Dashboard {
         } catch (error) {
             console.error('Error loading comparison data:', error);
             this.showError('加載比較數據失敗: ' + error.message);
-            
-            // Fallback to mock data for demo purposes
-            console.log('Using fallback mock comparison data');
-            await this.loadMockComparisonData(filters, page);
         } finally {
             this.showLoading(false);
         }
@@ -966,147 +914,6 @@ class Dashboard {
             totalPages: data.totalPages || Math.ceil((data.totalRecords || 0) / this.pageSize),
             totalRecords: data.totalRecords || 0,
             pageSize: this.pageSize
-        }, filters);
-    }
-
-    async loadMockSingleTSData(filters, page = 1) {
-        // Mock stats data
-        const statsElement = document.getElementById('statsCards');
-        if (statsElement) {
-            statsElement.innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <span class="ts-color" style="background-color: ${this.tsConfig[this.selectedTS]?.color || '#666'}"></span>
-                        <h3>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</h3>
-                    </div>
-                    <div class="stat-value">1,247</div>
-                    <div class="stat-label">總交易數</div>
-                    <div class="stat-secondary">
-                        <div>總重量: 8,542 噸</div>
-                        <div>平均: 6.85 噸</div>
-                        <div>最高: 15.2 噸</div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Mock table data
-        await this.loadMockTableData(filters, page);
-    }
-
-    async loadMockComparisonData(filters, page = 1) {
-        // Mock comparison stats
-        const statsElement = document.getElementById('statsCards');
-        if (statsElement) {
-            const statsHTML = Object.keys(this.tsConfig)
-                .filter(ts => !this.tsConfig[ts].isAdmin)
-                .map(tsCode => {
-                    const config = this.tsConfig[tsCode];
-                    const totalTransactions = Math.floor(Math.random() * 2000) + 500;
-                    const totalWeight = Math.floor(Math.random() * 15000) + 5000;
-                    const avgWeight = (totalWeight / totalTransactions).toFixed(2);
-                    const maxWeight = (Math.random() * 20 + 10).toFixed(1);
-                    
-                    return `
-                        <div class="stat-card ${tsCode.toLowerCase()}">
-                            <div class="stat-header">
-                                <span class="ts-color" style="background-color: ${config.color}"></span>
-                                <h3>${config.name}</h3>
-                            </div>
-                            <div class="stat-value">${totalTransactions.toLocaleString()}</div>
-                            <div class="stat-label">總交易數</div>
-                            <div class="stat-secondary">
-                                <div>總重量: ${totalWeight.toLocaleString()} 噸</div>
-                                <div>平均: ${avgWeight} 噸</div>
-                                <div>最高: ${maxWeight} 噸</div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            statsElement.innerHTML = statsHTML;
-        }
-        
-        // Mock comparison table
-        await this.loadMockComparisonTable(filters, page);
-    }
-
-    async loadMockTableData(filters, page = 1) {
-        const tableBody = document.getElementById('dataTable');
-        if (!tableBody) return;
-        
-        const mockData = Array.from({ length: 10 }, (_, i) => ({
-            TS_Name: this.tsConfig[this.selectedTS]?.name || this.selectedTS,
-            日期: `2024-${String(page).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
-            交收狀態: ['已完成', '進行中', '已取消'][i % 3],
-            車輛任務: ['收集', '轉運', '處理'][i % 3],
-            入磅時間: `08:${String(i * 5).padStart(2, '0')}`,
-            物料重量: (Math.random() * 10 + 5).toFixed(1),
-            廢物類別: ['P01.00', 'P05.00', 'D01.00'][i % 3],
-            來源: ['葵青區', '深水埗區', '灣仔區', '荃灣區', '觀塘區'][i % 5]
-        }));
-        
-        const tableHTML = mockData.map(record => `
-            <tr>
-                <td>${record.TS_Name}</td>
-                <td>${record.日期}</td>
-                <td>${record.交收狀態}</td>
-                <td>${record.車輛任務}</td>
-                <td>${record.入磅時間}</td>
-                <td>${record.物料重量}</td>
-                <td>${record.廢物類別}</td>
-                <td>${record.來源}</td>
-            </tr>
-        `).join('');
-        
-        tableBody.innerHTML = tableHTML;
-        
-        this.setupPagination({
-            currentPage: page,
-            totalPages: 5,
-            totalRecords: 50,
-            pageSize: 10
-        }, filters);
-    }
-
-    async loadMockComparisonTable(filters, page = 1) {
-        const tableBody = document.getElementById('dataTable');
-        if (!tableBody) return;
-        
-        const stations = Object.keys(this.tsConfig).filter(ts => !this.tsConfig[ts].isAdmin);
-        const mockData = Array.from({ length: 10 }, (_, i) => {
-            const randomTS = stations[Math.floor(Math.random() * stations.length)];
-            return {
-                TS_Name: this.tsConfig[randomTS].name,
-                日期: `2024-${String(page).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
-                交收狀態: ['已完成', '進行中', '已取消'][i % 3],
-                車輛任務: ['收集', '轉運', '處理'][i % 3],
-                入磅時間: `08:${String(i * 5).padStart(2, '0')}`,
-                物料重量: (Math.random() * 10 + 5).toFixed(1),
-                廢物類別: ['P01.00', 'P05.00', 'D01.00'][i % 3],
-                來源: ['葵青區', '深水埗區', '灣仔區', '荃灣區', '觀塘區'][i % 5]
-            };
-        });
-        
-        const tableHTML = mockData.map(record => `
-            <tr>
-                <td>${record.TS_Name}</td>
-                <td>${record.日期}</td>
-                <td>${record.交收狀態}</td>
-                <td>${record.車輛任務}</td>
-                <td>${record.入磅時間}</td>
-                <td>${record.物料重量}</td>
-                <td>${record.廢物類別}</td>
-                <td>${record.來源}</td>
-            </tr>
-        `).join('');
-        
-        tableBody.innerHTML = tableHTML;
-        
-        this.setupPagination({
-            currentPage: page,
-            totalPages: 5,
-            totalRecords: 50,
-            pageSize: 10
         }, filters);
     }
     
