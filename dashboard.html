@@ -18,6 +18,20 @@
 </head>
 <body>
     <!-- Immediate authentication check -->
+     <script>
+        (function() {
+            const currentUser = localStorage.getItem('ts_user');
+            console.log('Dashboard auth check - User:', currentUser);
+            
+            if (!currentUser) {
+                console.log('No user found, redirecting to login...');
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            console.log('User authenticated:', currentUser);
+        })();
+    </script>
     <script>
         // IMMEDIATE redirect if not authenticated - don't wait for DOMContentLoaded
         const currentUser = localStorage.getItem('ts_user');
@@ -204,4 +218,5 @@
     </script>
 </body>
 </html>
+
 
