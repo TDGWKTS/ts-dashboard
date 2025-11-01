@@ -389,3 +389,181 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new Dashboard();
 });
 
+class Dashboard {
+    // ... existing code ...
+
+    setupEventListeners() {
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const compareBtn = document.getElementById('compareBtn');
+        const exportCSVBtn = document.getElementById('exportCSV');
+        const logoutBtn = document.getElementById('logout');
+        const dateRangeFilter = document.getElementById('dateRangeFilter');
+        
+        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+        if (compareBtn) compareBtn.addEventListener('click', () => this.loadComparisonData(this.getCurrentFilters()));
+        if (exportCSVBtn) exportCSVBtn.addEventListener('click', () => this.exportCSV());
+        if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
+        if (dateRangeFilter) dateRangeFilter.addEventListener('change', () => this.handleDateRangeChange());
+        
+        // Set default dates
+        this.setDefaultDates();
+    }
+
+    handleDateRangeChange() {
+        const dateRangeType = document.getElementById('dateRangeFilter').value;
+        const customDateRange = document.getElementById('customDateRange');
+        const specificDateSelector = document.getElementById('specificDateSelector');
+        
+        // Hide all custom date selectors first
+        customDateRange.classList.add('hidden');
+        specificDateSelector.classList.add('hidden');
+        
+        // Show relevant selector
+        if (dateRangeType === 'custom') {
+            customDateRange.classList.remove('hidden');
+            this.setDefaultCustomDates();
+        } else if (dateRangeType === 'specificDate') {
+            specificDateSelector.classList.remove('hidden');
+            this.setDefaultSpecificDate();
+        }
+    }
+
+    setDefaultDates() {
+        // Set default dates for custom range (current month)
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        document.getElementById('startDate').value = this.formatDateForInput(firstDay);
+        document.getElementById('endDate').value = this.formatDateForInput(lastDay);
+        document.getElementById('specificDate').value = this.formatDateForInput(today);
+    }
+
+    setDefaultCustomDates() {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        document.getElementById('startDate').value = this.formatDateForInput(firstDay);
+        document.getElementById('endDate').value = this.formatDateForInput(lastDay);
+    }
+
+    setDefaultSpecificDate() {
+        const today = new Date();
+        document.getElementById('specificDate').value = this.formatDateForInput(today);
+    }
+
+    formatDateForInput(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    getCurrentFilters() {
+        const dateRangeType = document.getElementById('dateRangeFilter').value;
+        let dateRange;
+        
+        if (dateRangeType === 'custom') {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            dateRange = { type: 'custom', startDate, endDate };
+        } else if (dateRangeType === 'specificDate') {
+            const specificDate = document.getElementById('specificDate').value;
+            dateRange = { type: 'specificDate', date: specificDate };
+        } else {
+            dateRange = { type: dateRangeType, ...this.getDateRangeFromFilter(dateRangeType) };
+        }
+        
+        return {
+            dateRange: dateRange,
+            wasteCategory: document.getElementById('wasteCategoryFilter').value || '',
+            source: document.getElementById('sourceFilter').value || ''
+        };
+    }
+
+    getDateRangeFromFilter(filterValue) {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        
+        switch(filterValue) {
+            case 'currentQuarter':
+                return this.getQuarterRange(currentYear, Math.floor(currentMonth / 3) + 1);
+            case 'firstQuarter':
+                return this.getQuarterRange(currentYear, 1);
+            case 'secondQuarter':
+                return this.getQuarterRange(currentYear, 2);
+            case 'thirdQuarter':
+                return this.getQuarterRange(currentYear, 3);
+            case 'fourthQuarter':
+                return this.getQuarterRange(currentYear, 4);
+            case 'firstHalf':
+                return {
+                    start: new Date(currentYear, 0, 1),
+                    end: new Date(currentYear, 5, 30)
+                };
+            case 'secondHalf':
+                return {
+                    start: new Date(currentYear, 6, 1),
+                    end: new Date(currentYear, 11, 31)
+                };
+            case '1year':
+                const oneYearAgo = new Date(currentYear - 1, currentMonth, now.getDate());
+                return {
+                    start: oneYearAgo,
+                    end: now
+                };
+            default:
+                return {
+                    start: new Date(currentYear, 0, 1),
+                    end: now
+                };
+        }
+    }
+
+    getQuarterRange(year, quarter) {
+        switch(quarter) {
+            case 1: // Q1: Jan-Mar
+                return {
+                    start: new Date(year, 0, 1),
+                    end: new Date(year, 2, 31)
+                };
+            case 2: // Q2: Apr-Jun
+                return {
+                    start: new Date(year, 3, 1),
+                    end: new Date(year, 5, 30)
+                };
+            case 3: // Q3: Jul-Sep
+                return {
+                    start: new Date(year, 6, 1),
+                    end: new Date(year, 8, 30)
+                };
+            case 4: // Q4: Oct-Dec
+                return {
+                    start: new Date(year, 9, 1),
+                    end: new Date(year, 11, 31)
+                };
+            default:
+                return {
+                    start: new Date(year, 0, 1),
+                    end: new Date(year, 11, 31)
+                };
+        }
+    }
+
+    // Update your data loading methods to use the new date format
+    async loadSingleTSData(filters = {}, page = 1) {
+        console.log('Loading data with filters:', filters);
+        
+        this.showLoading(true);
+        this.showSkeletonUI();
+        this.currentPage = page;
+        
+        try {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            await this.loadMockSingleTSData(filters, page);
+        } catch (error) {
+            this.showError('加載數據失敗: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+}
