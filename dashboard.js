@@ -1,4 +1,4 @@
-// dashboard.js - Complete Fixed Version
+// dashboard.js - Complete Revised Version with Real API Integration
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -50,23 +50,132 @@ class Dashboard {
             this.showError('儀表板初始化失敗: ' + error.message);
         }
     }
+
+    async fetchFromAPI(endpoint, params = {}) {
+        try {
+            console.log(`Fetching from API: ${endpoint}`, params);
+            
+            const url = new URL(API_URL);
+            Object.keys(params).forEach(key => {
+                if (params[key]) {
+                    url.searchParams.append(key, params[key]);
+                }
+            });
+            
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`API response from ${endpoint}:`, data);
+            
+            if (data.status === 'error') {
+                throw new Error(data.message);
+            }
+            
+            return data;
+        } catch (error) {
+            console.error(`API fetch error for ${endpoint}:`, error);
+            throw error;
+        }
+    }
+
+    async fetchData(filters = {}, page = 1) {
+        const params = {
+            action: 'getData',
+            page: page.toString(),
+            pageSize: this.pageSize.toString()
+        };
+        
+        // Add station filter
+        if (this.selectedTS && this.selectedTS !== 'comparison') {
+            params.station = this.selectedTS;
+        }
+        
+        // Add date filters
+        if (filters.dateRange) {
+            if (filters.dateRange.type === 'custom' && filters.dateRange.startDate && filters.dateRange.endDate) {
+                params.startDate = filters.dateRange.startDate;
+                params.endDate = filters.dateRange.endDate;
+            } else if (filters.dateRange.type === 'specificDate' && filters.dateRange.date) {
+                params.specificDate = filters.dateRange.date;
+            } else if (filters.dateRange.type !== 'all') {
+                params.dateRange = filters.dateRange.type;
+            }
+        }
+        
+        // Add other filters
+        if (filters.wasteCategory) {
+            params.wasteCategory = filters.wasteCategory;
+        }
+        if (filters.source) {
+            params.sourceRegion = filters.source;
+        }
+        
+        return await this.fetchFromAPI('', params);
+    }
+
+    async fetchComparisonData(filters = {}, page = 1) {
+        const params = {
+            action: 'getComparison',
+            page: page.toString(),
+            pageSize: this.pageSize.toString()
+        };
+        
+        // Add date filters for comparison
+        if (filters.dateRange) {
+            if (filters.dateRange.type === 'custom' && filters.dateRange.startDate && filters.dateRange.endDate) {
+                params.startDate = filters.dateRange.startDate;
+                params.endDate = filters.dateRange.endDate;
+            } else if (filters.dateRange.type === 'specificDate' && filters.dateRange.date) {
+                params.specificDate = filters.dateRange.date;
+            } else if (filters.dateRange.type !== 'all') {
+                params.dateRange = filters.dateRange.type;
+            }
+        }
+        
+        // Add other filters for comparison
+        if (filters.wasteCategory) {
+            params.wasteCategory = filters.wasteCategory;
+        }
+        if (filters.source) {
+            params.sourceRegion = filters.source;
+        }
+        
+        return await this.fetchFromAPI('', params);
+    }
     
     autoSelectStation() {
         if (!this.isAdmin && this.currentUser) {
             this.selectedTS = this.currentUser;
             console.log('Auto-selecting station for regular user:', this.selectedTS);
             this.showFilterPanel();
-            // Don't auto-load data yet, wait for user to click
         } else if (this.isAdmin) {
             console.log('Admin user - waiting for manual station selection');
-            // Admin users need to select a station manually
         }
     }
     
     async loadTSConfig() {
         try {
-            console.log('Loading TS configuration...');
-            // Use demo configuration for now
+            console.log('Loading TS configuration from API...');
+            const data = await this.fetchFromAPI('', { action: 'getStations' });
+            
+            if (data && data.stations) {
+                this.tsConfig = data.stations;
+                console.log('TS Config loaded successfully from API:', this.tsConfig);
+            } else {
+                throw new Error('Invalid station configuration received');
+            }
+        } catch (error) {
+            console.error('Error loading TS config from API, using fallback:', error);
+            // Fallback to demo configuration
             this.tsConfig = {
                 'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
                 'IWTS': { name: '港島西轉運站', color: '#4ECDC4', isAdmin: false },
@@ -76,16 +185,22 @@ class Dashboard {
                 'STTS': { name: '沙田轉運站', color: '#DDA0DD', isAdmin: false },
                 'WKTS': { name: '西九龍轉運站', color: '#98D8C8', isAdmin: true }
             };
-            console.log('TS Config loaded successfully:', this.tsConfig);
-        } catch (error) {
-            console.error('Error loading TS config:', error);
         }
     }
 
     async loadDynamicFilters() {
         try {
-            console.log('Loading dynamic filters...');
-            // Demo filters for now
+            console.log('Loading dynamic filters from API...');
+            const data = await this.fetchFromAPI('', { action: 'getFilters' });
+            
+            if (data) {
+                this.populateDynamicFilters(data);
+            } else {
+                throw new Error('No filter data received');
+            }
+        } catch (error) {
+            console.error('Error loading filters from API, using fallback:', error);
+            // Fallback to demo filters
             const demoFilterData = {
                 wasteCategories: [
                     'P01.00 - 都市固體廢物',
@@ -103,8 +218,6 @@ class Dashboard {
             };
             
             this.populateDynamicFilters(demoFilterData);
-        } catch (error) {
-            console.error('Error loading filters:', error);
         }
     }
 
@@ -192,7 +305,7 @@ class Dashboard {
             console.log('Export CSV listener added');
         }
         
-        // Logout button - FIXED
+        // Logout button
         const logoutBtn = document.getElementById('logout');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
@@ -489,19 +602,22 @@ class Dashboard {
     }
     
     async loadSingleTSData(filters = {}, page = 1) {
-        console.log('Loading single station data:', this.selectedTS, filters, 'Page:', page);
+        console.log('Loading single station data from API:', this.selectedTS, filters, 'Page:', page);
         
         this.showLoading(true);
         this.showSkeletonUI();
         this.currentPage = page;
         
         try {
-            // Simulate API call with demo data
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await this.loadMockSingleTSData(filters, page);
+            const data = await this.fetchData(filters, page);
+            await this.displaySingleTSData(data, filters, page);
         } catch (error) {
             console.error('Error loading single TS data:', error);
             this.showError('加載數據失敗: ' + error.message);
+            
+            // Fallback to mock data for demo purposes
+            console.log('Using fallback mock data');
+            await this.loadMockSingleTSData(filters, page);
         } finally {
             this.showLoading(false);
         }
@@ -513,7 +629,7 @@ class Dashboard {
             return;
         }
         
-        console.log('Loading comparison data with filters:', filters, 'Page:', page);
+        console.log('Loading comparison data from API with filters:', filters, 'Page:', page);
         
         this.showLoading(true);
         this.showSkeletonUI();
@@ -521,17 +637,154 @@ class Dashboard {
         this.currentPage = page;
         
         try {
-            // Simulate API call with demo data
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await this.loadMockComparisonData(filters, page);
+            const data = await this.fetchComparisonData(filters, page);
+            await this.displayComparisonData(data, filters, page);
         } catch (error) {
             console.error('Error loading comparison data:', error);
             this.showError('加載比較數據失敗: ' + error.message);
+            
+            // Fallback to mock data for demo purposes
+            console.log('Using fallback mock comparison data');
+            await this.loadMockComparisonData(filters, page);
         } finally {
             this.showLoading(false);
         }
     }
 
+    async displaySingleTSData(data, filters, page = 1) {
+        // Display stats data
+        const statsElement = document.getElementById('statsCards');
+        if (statsElement && data.stats) {
+            statsElement.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="ts-color" style="background-color: ${this.tsConfig[this.selectedTS]?.color || '#666'}"></span>
+                        <h3>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</h3>
+                    </div>
+                    <div class="stat-value">${data.stats.totalTransactions?.toLocaleString() || '0'}</div>
+                    <div class="stat-label">總交易數</div>
+                    <div class="stat-secondary">
+                        <div>總重量: ${data.stats.totalWeight?.toLocaleString() || '0'} 噸</div>
+                        <div>平均: ${data.stats.averageWeight?.toFixed(2) || '0'} 噸</div>
+                        <div>最高: ${data.stats.maxWeight?.toFixed(1) || '0'} 噸</div>
+                    </div>
+                </div>
+            `;
+        } else if (statsElement) {
+            // Fallback if stats not available
+            statsElement.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="ts-color" style="background-color: ${this.tsConfig[this.selectedTS]?.color || '#666'}"></span>
+                        <h3>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</h3>
+                    </div>
+                    <div class="stat-value">--</div>
+                    <div class="stat-label">總交易數</div>
+                    <div class="stat-secondary">
+                        <div>總重量: -- 噸</div>
+                        <div>平均: -- 噸</div>
+                        <div>最高: -- 噸</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Display table data
+        await this.displayTableData(data, filters, page);
+    }
+
+    async displayComparisonData(data, filters, page = 1) {
+        // Display comparison stats
+        const statsElement = document.getElementById('statsCards');
+        if (statsElement && data.stats) {
+            const statsHTML = Object.keys(data.stats).map(tsCode => {
+                const stationStats = data.stats[tsCode];
+                const config = this.tsConfig[tsCode];
+                
+                if (!config || !stationStats) return '';
+                
+                return `
+                    <div class="stat-card ${tsCode.toLowerCase()}">
+                        <div class="stat-header">
+                            <span class="ts-color" style="background-color: ${config.color}"></span>
+                            <h3>${config.name}</h3>
+                        </div>
+                        <div class="stat-value">${stationStats.totalTransactions?.toLocaleString() || '0'}</div>
+                        <div class="stat-label">總交易數</div>
+                        <div class="stat-secondary">
+                            <div>總重量: ${stationStats.totalWeight?.toLocaleString() || '0'} 噸</div>
+                            <div>平均: ${stationStats.averageWeight?.toFixed(2) || '0'} 噸</div>
+                            <div>最高: ${stationStats.maxWeight?.toFixed(1) || '0'} 噸</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            statsElement.innerHTML = statsHTML;
+        } else if (statsElement) {
+            // Fallback if stats not available
+            const stations = Object.keys(this.tsConfig).filter(ts => !this.tsConfig[ts].isAdmin);
+            const statsHTML = stations.map(tsCode => {
+                const config = this.tsConfig[tsCode];
+                return `
+                    <div class="stat-card ${tsCode.toLowerCase()}">
+                        <div class="stat-header">
+                            <span class="ts-color" style="background-color: ${config.color}"></span>
+                            <h3>${config.name}</h3>
+                        </div>
+                        <div class="stat-value">--</div>
+                        <div class="stat-label">總交易數</div>
+                        <div class="stat-secondary">
+                            <div>總重量: -- 噸</div>
+                            <div>平均: -- 噸</div>
+                            <div>最高: -- 噸</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            statsElement.innerHTML = statsHTML;
+        }
+        
+        // Display comparison table
+        await this.displayTableData(data, filters, page);
+    }
+
+    async displayTableData(data, filters, page = 1) {
+        const tableBody = document.getElementById('dataTable');
+        if (!tableBody) return;
+        
+        if (data.records && data.records.length > 0) {
+            const tableHTML = data.records.map(record => `
+                <tr>
+                    <td>${record.TS_Name || record.station || '--'}</td>
+                    <td>${record.日期 || record.date || '--'}</td>
+                    <td>${record.交收狀態 || record.status || '--'}</td>
+                    <td>${record.車輛任務 || record.vehicleTask || '--'}</td>
+                    <td>${record.入磅時間 || record.weighingTime || '--'}</td>
+                    <td>${record.物料重量 || record.materialWeight || '0'}</td>
+                    <td>${record.廢物類別 || record.wasteCategory || '--'}</td>
+                    <td>${record.來源 || record.sourceRegion || '--'}</td>
+                </tr>
+            `).join('');
+            
+            tableBody.innerHTML = tableHTML;
+        } else {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="no-data">沒有找到符合條件的數據</td>
+                </tr>
+            `;
+        }
+        
+        // Setup pagination
+        this.setupPagination({
+            currentPage: page,
+            totalPages: data.totalPages || Math.ceil((data.totalRecords || 0) / this.pageSize),
+            totalRecords: data.totalRecords || 0,
+            pageSize: this.pageSize
+        }, filters);
+    }
+
+    // Keep mock data methods as fallback
     async loadMockSingleTSData(filters, page = 1) {
         // Mock stats data
         const statsElement = document.getElementById('statsCards');
@@ -805,7 +1058,6 @@ class Dashboard {
     }
 
     initMobileNavigation() {
-        // Mobile navigation can be added later
         console.log('Mobile navigation placeholder');
     }
     
