@@ -1,4 +1,4 @@
-// dashboard.js - Complete Revised Version with Real API Integration
+// dashboard.js - Complete Revised Version with Checkbox Filters
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -13,6 +13,8 @@ class Dashboard {
         this.pageSize = 50;
         this.mobileNav = null;
         this.selectedTS = null;
+        this.selectedWasteCategories = [];
+        this.selectedSourceRegions = [];
         
         console.log('Dashboard initialized:', {
             user: this.currentUser,
@@ -111,12 +113,14 @@ class Dashboard {
             }
         }
         
-        // Add other filters
-        if (filters.wasteCategory) {
-            params.wasteCategory = filters.wasteCategory;
+        // Add waste category filters (multiple selection)
+        if (filters.wasteCategories && filters.wasteCategories.length > 0) {
+            params.wasteCategories = filters.wasteCategories.join(',');
         }
-        if (filters.source) {
-            params.sourceRegion = filters.source;
+        
+        // Add source region filters (multiple selection)
+        if (filters.sourceRegions && filters.sourceRegions.length > 0) {
+            params.sourceRegions = filters.sourceRegions.join(',');
         }
         
         return await this.fetchFromAPI('', params);
@@ -141,12 +145,14 @@ class Dashboard {
             }
         }
         
-        // Add other filters for comparison
-        if (filters.wasteCategory) {
-            params.wasteCategory = filters.wasteCategory;
+        // Add waste category filters (multiple selection)
+        if (filters.wasteCategories && filters.wasteCategories.length > 0) {
+            params.wasteCategories = filters.wasteCategories.join(',');
         }
-        if (filters.source) {
-            params.sourceRegion = filters.source;
+        
+        // Add source region filters (multiple selection)
+        if (filters.sourceRegions && filters.sourceRegions.length > 0) {
+            params.sourceRegions = filters.sourceRegions.join(',');
         }
         
         return await this.fetchFromAPI('', params);
@@ -190,56 +196,237 @@ class Dashboard {
 
     async loadDynamicFilters() {
         try {
-            console.log('Loading dynamic filters from API...');
-            const data = await this.fetchFromAPI('', { action: 'getFilters' });
+            console.log('Loading dynamic filters from GAS API...');
             
-            if (data) {
-                this.populateDynamicFilters(data);
+            // Fetch filter options from Google Apps Script
+            const filterData = await this.fetchFromAPI('', { 
+                action: 'getFilterOptions' 
+            });
+            
+            console.log('Raw filter data from GAS:', filterData);
+            
+            if (filterData && (filterData.wasteCategories || filterData.sourceRegions)) {
+                this.populateDynamicFilters(filterData);
+                console.log('Dynamic filters loaded successfully from GAS');
             } else {
-                throw new Error('No filter data received');
+                // If the API doesn't return the expected structure, try alternative approaches
+                await this.loadFilterDataAlternative();
             }
-        } catch (error) {
-            console.error('Error loading filters from API, using fallback:', error);
-            // Fallback to demo filters
-            const demoFilterData = {
-                wasteCategories: [
-                    'P01.00 - 都市固體廢物',
-                    'P05.00 - 建築廢料', 
-                    'D01.00 - 危險廢物',
-                    'C01.00 - 商業廢物',
-                    'C02.00 - 工業廢物',
-                    'M01.00 - 混合廢物'
-                ],
-                sourceRegions: [
-                    '中西區', '灣仔區', '東區', '南區',
-                    '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
-                    '葵青區', '荃灣區', '屯門區', '元朗區'
-                ]
-            };
             
-            this.populateDynamicFilters(demoFilterData);
+        } catch (error) {
+            console.error('Error loading dynamic filters from GAS:', error);
+            await this.loadFilterDataAlternative();
         }
     }
 
-    populateDynamicFilters(data) {
-        console.log('Populating dynamic filters:', data);
+    async loadFilterDataAlternative() {
+        try {
+            console.log('Trying alternative approach to load filters...');
+            
+            // Alternative 1: Get filters from the main data endpoint
+            const data = await this.fetchFromAPI('', { 
+                action: 'getData',
+                limit: 1 // Just get one record to extract unique values
+            });
+            
+            if (data && data.records && data.records.length > 0) {
+                // Extract unique values from the sample data
+                const wasteCategories = [...new Set(data.records.map(item => item.廢物類別 || item.wasteCategory).filter(Boolean))];
+                const sourceRegions = [...new Set(data.records.map(item => item.來源 || item.sourceRegion).filter(Boolean))];
+                
+                const filterData = {
+                    wasteCategories: wasteCategories,
+                    sourceRegions: sourceRegions
+                };
+                
+                this.populateDynamicFilters(filterData);
+                console.log('Filters loaded from sample data:', filterData);
+                return;
+            }
+        } catch (error) {
+            console.error('Alternative approach failed:', error);
+        }
         
-        // Populate Waste Category filter
-        const wasteCategoryFilter = document.getElementById('wasteCategoryFilter');
-        if (wasteCategoryFilter && data.wasteCategories) {
-            wasteCategoryFilter.innerHTML = '<option value="">所有類別</option>' +
-                data.wasteCategories.map(category => 
-                    `<option value="${category}">${category}</option>`
-                ).join('');
+        // Final fallback to mock data
+        console.log('Using fallback mock filter data');
+        const demoFilterData = {
+            wasteCategories: [
+                'P01.00 - 都市固體廢物',
+                'P05.00 - 建築廢料', 
+                'D01.00 - 危險廢物',
+                'C01.00 - 商業廢物',
+                'C02.00 - 工業廢物',
+                'M01.00 - 混合廢物'
+            ],
+            sourceRegions: [
+                '中西區', '灣仔區', '東區', '南區',
+                '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
+                '葵青區', '荃灣區', '屯門區', '元朗區'
+            ]
+        };
+        
+        this.populateDynamicFilters(demoFilterData);
+    }
+
+    populateDynamicFilters(data) {
+        console.log('Populating dynamic filters with data:', data);
+        
+        // Populate Waste Category filter with checkboxes
+        this.createCheckboxFilter('wasteCategoryFilter', '廢物類別', data.wasteCategories, this.selectedWasteCategories);
+        
+        // Populate Source Region filter with checkboxes
+        this.createCheckboxFilter('sourceFilter', '來源地區', data.sourceRegions, this.selectedSourceRegions);
+    }
+
+    createCheckboxFilter(containerId, filterName, options, selectedItems) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container not found: ${containerId}`);
+            return;
         }
 
-        // Populate Source Region filter
-        const sourceFilter = document.getElementById('sourceFilter');
-        if (sourceFilter && data.sourceRegions) {
-            sourceFilter.innerHTML = '<option value="">所有地區</option>' +
-                data.sourceRegions.map(region => 
-                    `<option value="${region}">${region}</option>`
-                ).join('');
+        if (!options || options.length === 0) {
+            container.innerHTML = `<div class="no-options">沒有可用的${filterName}選項</div>`;
+            return;
+        }
+
+        // Sort options for better user experience
+        const sortedOptions = options.sort();
+        
+        const filterHTML = `
+            <div class="checkbox-filter-container">
+                <div class="filter-header">
+                    <h4>${filterName}</h4>
+                    <button type="button" class="select-all-btn" data-filter="${containerId}">全選</button>
+                    <button type="button" class="clear-all-btn" data-filter="${containerId}">清除</button>
+                </div>
+                <div class="checkbox-options">
+                    <div class="checkbox-option all-option">
+                        <label>
+                            <input type="checkbox" class="select-all-checkbox" data-filter="${containerId}">
+                            <span class="checkmark"></span>
+                            <span class="option-text">所有${filterName}</span>
+                        </label>
+                    </div>
+                    ${sortedOptions.map(option => `
+                        <div class="checkbox-option">
+                            <label>
+                                <input type="checkbox" value="${option}" 
+                                       ${selectedItems.includes(option) ? 'checked' : ''}>
+                                <span class="checkmark"></span>
+                                <span class="option-text">${option}</span>
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="selected-count" id="${containerId}-count">
+                    已選擇: 0/${sortedOptions.length}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = filterHTML;
+        this.updateSelectedCount(containerId, sortedOptions.length);
+        this.setupCheckboxEvents(containerId);
+        
+        console.log(`Checkbox filter created for ${filterName} with`, sortedOptions.length, 'options');
+    }
+
+    setupCheckboxEvents(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        // Select all functionality
+        const selectAllBtn = container.querySelector('.select-all-btn');
+        const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+        const clearAllBtn = container.querySelector('.clear-all-btn');
+        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-checkbox)');
+
+        // Select all button
+        selectAllBtn.addEventListener('click', () => {
+            individualCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            selectAllCheckbox.checked = true;
+            this.updateFilterSelection(containerId);
+        });
+
+        // Clear all button
+        clearAllBtn.addEventListener('click', () => {
+            individualCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectAllCheckbox.checked = false;
+            this.updateFilterSelection(containerId);
+        });
+
+        // Select all checkbox
+        selectAllCheckbox.addEventListener('change', (e) => {
+            individualCheckboxes.forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+            });
+            this.updateFilterSelection(containerId);
+        });
+
+        // Individual checkboxes
+        individualCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.updateFilterSelection(containerId);
+            });
+        });
+    }
+
+    updateFilterSelection(containerId) {
+        const container = document.getElementById(containerId);
+        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-checkbox)');
+        const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+        const totalOptions = individualCheckboxes.length;
+
+        // Get selected values
+        const selectedValues = Array.from(individualCheckboxes)
+            .filter(checkbox => checkbox.checked)
+            .map(checkbox => checkbox.value);
+
+        // Update select all checkbox state
+        const allSelected = selectedValues.length === totalOptions;
+        const someSelected = selectedValues.length > 0 && selectedValues.length < totalOptions;
+        
+        selectAllCheckbox.checked = allSelected;
+        selectAllCheckbox.indeterminate = someSelected;
+
+        // Update the corresponding selected arrays
+        if (containerId === 'wasteCategoryFilter') {
+            this.selectedWasteCategories = selectedValues;
+        } else if (containerId === 'sourceFilter') {
+            this.selectedSourceRegions = selectedValues;
+        }
+
+        // Update selected count display
+        this.updateSelectedCount(containerId, totalOptions);
+
+        console.log(`Updated ${containerId}:`, selectedValues);
+    }
+
+    updateSelectedCount(containerId, totalOptions) {
+        const countElement = document.getElementById(`${containerId}-count`);
+        if (!countElement) return;
+
+        let selectedCount = 0;
+        if (containerId === 'wasteCategoryFilter') {
+            selectedCount = this.selectedWasteCategories.length;
+        } else if (containerId === 'sourceFilter') {
+            selectedCount = this.selectedSourceRegions.length;
+        }
+
+        countElement.textContent = `已選擇: ${selectedCount}/${totalOptions}`;
+        
+        // Update style based on selection
+        if (selectedCount === 0) {
+            countElement.className = 'selected-count none-selected';
+        } else if (selectedCount === totalOptions) {
+            countElement.className = 'selected-count all-selected';
+        } else {
+            countElement.className = 'selected-count some-selected';
         }
     }
     
@@ -577,8 +764,8 @@ class Dashboard {
         
         const filters = {
             dateRange: dateRange,
-            wasteCategory: document.getElementById('wasteCategoryFilter').value || '',
-            source: document.getElementById('sourceFilter').value || ''
+            wasteCategories: this.selectedWasteCategories,
+            sourceRegions: this.selectedSourceRegions
         };
         
         console.log('Current filters:', filters);
