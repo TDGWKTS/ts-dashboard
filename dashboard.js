@@ -1,4 +1,4 @@
-﻿// Replace with your Google Apps Script deployment URL
+// Replace with your Google Apps Script deployment URL
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -11,22 +11,30 @@ class Dashboard {
         this.comparisonData = {};
         this.currentPage = 1;
         this.pageSize = 50;
-        this.init();
-    }
-    
-    async init() {
+        this.mobileNav = null;
+        
+        // Check authentication first
         if (!this.currentUser) {
             window.location.href = 'index.html';
             return;
         }
         
-        await this.loadTSConfig();
-        this.setupUI();
-        this.setupEventListeners();
-        this.loadNavigation();
-        
-        if (this.isAdmin) {
-            this.setupComparisonFilters();
+        this.init();
+    }
+    
+    async init() {
+        try {
+            await this.loadTSConfig();
+            this.setupUI();
+            this.setupEventListeners();
+            this.loadNavigation();
+            this.initMobileNavigation();
+            
+            if (this.isAdmin) {
+                this.setupComparisonFilters();
+            }
+        } catch (error) {
+            console.error('Dashboard initialization failed:', error);
         }
     }
     
@@ -52,10 +60,16 @@ class Dashboard {
     }
     
     setupEventListeners() {
-        document.getElementById('applyFilters').addEventListener('click', () => this.applyFilters());
-        document.getElementById('compareBtn').addEventListener('click', () => this.loadComparisonData(this.getCurrentFilters()));
-        document.getElementById('exportCSV').addEventListener('click', () => this.exportCSV());
-        document.getElementById('logout').addEventListener('click', () => this.logout());
+        // Add null checks for event listeners
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const compareBtn = document.getElementById('compareBtn');
+        const exportCSVBtn = document.getElementById('exportCSV');
+        const logoutBtn = document.getElementById('logout');
+        
+        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+        if (compareBtn) compareBtn.addEventListener('click', () => this.loadComparisonData(this.getCurrentFilters()));
+        if (exportCSVBtn) exportCSVBtn.addEventListener('click', () => this.exportCSV());
+        if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
     }
     
     setupComparisonFilters() {
@@ -64,7 +78,10 @@ class Dashboard {
     
     loadNavigation() {
         const nav = document.getElementById('sidebarNav');
+        if (!nav) return;
+        
         const myStationSection = nav.querySelector('.nav-section:first-child');
+        if (!myStationSection) return;
         
         // Clear existing navigation
         myStationSection.innerHTML = '<div class="nav-title">我的轉運站</div>';
@@ -81,7 +98,7 @@ class Dashboard {
                 </span>
             `;
             
-            link.addEventListener('click', () => this.selectTS(tsCode));
+            link.addEventListener('click', (e) => this.selectTS(tsCode, e));
             
             if (tsCode === this.currentUser && !config.isAdmin) {
                 link.classList.add('active');
@@ -90,30 +107,36 @@ class Dashboard {
                 link.classList.add('active');
                 myStationSection.appendChild(link);
             } else if (this.isAdmin) {
-                document.getElementById('adminSection').appendChild(link);
+                const adminSection = document.getElementById('adminSection');
+                if (adminSection) adminSection.appendChild(link);
             }
         });
     }
     
-    async selectTS(tsCode) {
+    async selectTS(tsCode, event) {
         // Update active state
         document.querySelectorAll('#sidebarNav a').forEach(link => link.classList.remove('active'));
-        event.target.closest('a').classList.add('active');
+        if (event && event.target.closest('a')) {
+            event.target.closest('a').classList.add('active');
+        }
         
         this.selectedTS = tsCode;
         this.showFilterPanel();
     }
     
     showFilterPanel() {
-        document.getElementById('welcomePage').classList.add('hidden');
-        document.getElementById('dashboardContent').classList.remove('hidden');
+        const welcomePage = document.getElementById('welcomePage');
+        const dashboardContent = document.getElementById('dashboardContent');
+        
+        if (welcomePage) welcomePage.classList.add('hidden');
+        if (dashboardContent) dashboardContent.classList.remove('hidden');
     }
     
     getCurrentFilters() {
         return {
-            dateRange: document.getElementById('dateRangeFilter').value,
-            wasteCategory: document.getElementById('wasteCategoryFilter').value,
-            source: document.getElementById('sourceFilter').value
+            dateRange: document.getElementById('dateRangeFilter')?.value || '',
+            wasteCategory: document.getElementById('wasteCategoryFilter')?.value || '',
+            source: document.getElementById('sourceFilter')?.value || ''
         };
     }
     
@@ -152,6 +175,8 @@ class Dashboard {
     
     async loadComparisonStats(filters) {
         const statsElement = document.getElementById('statsCards');
+        if (!statsElement) return;
+        
         statsElement.innerHTML = this.createStatsSkeleton();
         
         try {
@@ -181,6 +206,8 @@ class Dashboard {
     
     async loadComparisonCharts(filters) {
         const chartsContainer = document.getElementById('chartsContainer');
+        if (!chartsContainer) return;
+        
         chartsContainer.innerHTML = this.createChartsSkeleton();
         
         try {
@@ -210,6 +237,8 @@ class Dashboard {
     
     async loadComparisonTable(filters, page = 1) {
         const tableContainer = document.getElementById('dataTable');
+        if (!tableContainer) return;
+        
         tableContainer.innerHTML = this.createTableSkeleton();
         
         try {
@@ -240,6 +269,7 @@ class Dashboard {
     
     renderComparisonStats(statsData) {
         const statsContainer = document.getElementById('statsCards');
+        if (!statsContainer) return;
         
         if (!statsData || statsData.length === 0) {
             statsContainer.innerHTML = '<div class="no-data">選定的篩選條件沒有可用數據</div>';
@@ -267,6 +297,7 @@ class Dashboard {
     
     renderComparisonCharts(chartData) {
         const chartsContainer = document.getElementById('chartsContainer');
+        if (!chartsContainer) return;
         
         if (!chartData.monthlyTrends) {
             chartsContainer.innerHTML = '<div class="no-data">沒有可用的圖表數據</div>';
@@ -293,57 +324,62 @@ class Dashboard {
         `;
         
         // Render Monthly Trends Chart
-        const trendsCtx = document.getElementById('monthlyTrendsChart').getContext('2d');
-        new Chart(trendsCtx, {
-            type: 'line',
-            data: chartData.monthlyTrends,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: '總重量 (噸)' }
+        const trendsCtx = document.getElementById('monthlyTrendsChart')?.getContext('2d');
+        if (trendsCtx && chartData.monthlyTrends) {
+            new Chart(trendsCtx, {
+                type: 'line',
+                data: chartData.monthlyTrends,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '總重量 (噸)' }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
         
         // Render TS Comparison Chart
-        const comparisonData = {
-            labels: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].name),
-            datasets: [{
-                label: '總重量 (噸)',
-                data: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => {
-                    const tsStats = chartData.monthlyTrends.datasets.find(d => d.label === this.tsConfig[ts].name);
-                    return tsStats ? tsStats.data.reduce((a, b) => a + b, 0) : 0;
-                }),
-                backgroundColor: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].color),
-                borderColor: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].color),
-                borderWidth: 2
-            }]
-        };
-        
-        const comparisonCtx = document.getElementById('tsComparisonChart').getContext('2d');
-        new Chart(comparisonCtx, {
-            type: 'bar',
-            data: comparisonData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: '總重量 (噸)' }
+        const comparisonCtx = document.getElementById('tsComparisonChart')?.getContext('2d');
+        if (comparisonCtx) {
+            const comparisonData = {
+                labels: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].name),
+                datasets: [{
+                    label: '總重量 (噸)',
+                    data: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => {
+                        const tsStats = chartData.monthlyTrends?.datasets?.find(d => d.label === this.tsConfig[ts].name);
+                        return tsStats ? tsStats.data.reduce((a, b) => a + b, 0) : 0;
+                    }),
+                    backgroundColor: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].color),
+                    borderColor: Object.keys(this.tsConfig).filter(ts => ts !== 'WKTS').map(ts => this.tsConfig[ts].color),
+                    borderWidth: 2
+                }]
+            };
+            
+            new Chart(comparisonCtx, {
+                type: 'bar',
+                data: comparisonData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '總重量 (噸)' }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
     
     renderComparisonTable(result) {
         const tableBody = document.getElementById('dataTable');
+        if (!tableBody) return;
         
         if (!result.data || result.data.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="8" class="no-data">沒有找到記錄</td></tr>';
@@ -370,21 +406,25 @@ class Dashboard {
         const infoElement = document.getElementById('paginationInfo');
         const controlsElement = document.getElementById('paginationControls');
         
-        infoElement.textContent = `顯示 ${((pagination.currentPage - 1) * pagination.pageSize) + 1}-${Math.min(pagination.currentPage * pagination.pageSize, pagination.totalRecords)} 條，共 ${pagination.totalRecords.toLocaleString()} 條記錄`;
-        
-        let controlsHTML = '';
-        
-        if (pagination.currentPage > 1) {
-            controlsHTML += `<button class="pagination-btn" onclick="dashboard.loadComparisonTable(${JSON.stringify(filters)}, ${pagination.currentPage - 1})">上一頁</button>`;
+        if (infoElement) {
+            infoElement.textContent = `顯示 ${((pagination.currentPage - 1) * pagination.pageSize) + 1}-${Math.min(pagination.currentPage * pagination.pageSize, pagination.totalRecords)} 條，共 ${pagination.totalRecords.toLocaleString()} 條記錄`;
         }
         
-        controlsHTML += `<span class="pagination-info">第 ${pagination.currentPage} 頁，共 ${pagination.totalPages} 頁</span>`;
-        
-        if (pagination.currentPage < pagination.totalPages) {
-            controlsHTML += `<button class="pagination-btn" onclick="dashboard.loadComparisonTable(${JSON.stringify(filters)}, ${pagination.currentPage + 1})">下一頁</button>`;
+        if (controlsElement) {
+            let controlsHTML = '';
+            
+            if (pagination.currentPage > 1) {
+                controlsHTML += `<button class="pagination-btn" onclick="dashboard.loadComparisonTable(${JSON.stringify(filters)}, ${pagination.currentPage - 1})">上一頁</button>`;
+            }
+            
+            controlsHTML += `<span class="pagination-info">第 ${pagination.currentPage} 頁，共 ${pagination.totalPages} 頁</span>`;
+            
+            if (pagination.currentPage < pagination.totalPages) {
+                controlsHTML += `<button class="pagination-btn" onclick="dashboard.loadComparisonTable(${JSON.stringify(filters)}, ${pagination.currentPage + 1})">下一頁</button>`;
+            }
+            
+            controlsElement.innerHTML = controlsHTML;
         }
-        
-        controlsElement.innerHTML = controlsHTML;
     }
     
     // Skeleton UI methods
@@ -401,9 +441,13 @@ class Dashboard {
     }
     
     showSkeletonUI() {
-        document.getElementById('statsCards').innerHTML = this.createStatsSkeleton();
-        document.getElementById('chartsContainer').innerHTML = this.createChartsSkeleton();
-        document.getElementById('dataTable').innerHTML = this.createTableSkeleton();
+        const statsCards = document.getElementById('statsCards');
+        const chartsContainer = document.getElementById('chartsContainer');
+        const dataTable = document.getElementById('dataTable');
+        
+        if (statsCards) statsCards.innerHTML = this.createStatsSkeleton();
+        if (chartsContainer) chartsContainer.innerHTML = this.createChartsSkeleton();
+        if (dataTable) dataTable.innerHTML = this.createTableSkeleton();
     }
     
     showLoading(show) {
@@ -472,52 +516,6 @@ class Dashboard {
         document.body.removeChild(link);
     }
     
-    logout() {
-        localStorage.removeItem('ts_user');
-        localStorage.removeItem('ts_fullname');
-        localStorage.removeItem('ts_isAdmin');
-        window.location.href = 'index.html';
-    }
-}
-
-// Initialize dashboard when page loads
-let dashboard;
-document.addEventListener('DOMContentLoaded', () => {
-    dashboard = new Dashboard();
-});
-
-// Add this to your Dashboard class in dashboard.js
-class Dashboard {
-    constructor() {
-        this.currentUser = localStorage.getItem('ts_user');
-        this.userFullName = localStorage.getItem('ts_fullname');
-        this.isAdmin = localStorage.getItem('ts_isAdmin') === 'true';
-        this.currentData = [];
-        this.tsConfig = {};
-        this.comparisonData = {};
-        this.currentPage = 1;
-        this.pageSize = 50;
-        this.mobileNav = null; // Add mobile nav reference
-        this.init();
-    }
-    
-    async init() {
-        if (!this.currentUser) {
-            window.location.href = 'index.html';
-            return;
-        }
-        
-        await this.loadTSConfig();
-        this.setupUI();
-        this.setupEventListeners();
-        this.loadNavigation();
-        this.initMobileNavigation(); // Initialize mobile nav
-        
-        if (this.isAdmin) {
-            this.setupComparisonFilters();
-        }
-    }
-    
     initMobileNavigation() {
         // Mobile navigation will auto-initialize via mobile-nav.js
         // We just need to ensure it's available
@@ -526,5 +524,25 @@ class Dashboard {
         }
     }
     
-    // ... rest of your existing dashboard.js code ...
+    logout() {
+        localStorage.removeItem('ts_user');
+        localStorage.removeItem('ts_fullname');
+        localStorage.removeItem('ts_isAdmin');
+        window.location.href = 'index.html';
+    }
 }
+
+// Initialize dashboard when page loads - ONLY ONCE
+document.addEventListener('DOMContentLoaded', () => {
+    // Check authentication using your existing tokens
+    const currentUser = localStorage.getItem('ts_user');
+    
+    if (!currentUser) {
+        window.location.href = 'index.html';
+        return;
+    }
+    
+    // Initialize dashboard only if authenticated
+    console.log('Dashboard initialized for authenticated user:', currentUser);
+    window.dashboard = new Dashboard();
+});
