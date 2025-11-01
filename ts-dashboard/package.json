@@ -1,0 +1,14 @@
+﻿{
+  "name": "ts-dashboard",
+  "version": "1.0.0",
+  "description": "Transfer Station Dashboard - Static HTML/CSS/JS",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build process needed - static site'",
+    "dev": "echo 'Open index.html in browser'"
+  },
+  "keywords": ["dashboard", "transfer-station", "static"],
+  "author": "Your Name",
+  "license": "MIT",
+  "type": "module"
+}
