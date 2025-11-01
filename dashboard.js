@@ -1,4 +1,4 @@
-// dashboard.js - Complete Version with JSONP for CORS
+// dashboard.js - Complete Revised Version with Checkbox Filters
 const API_BASE = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -290,13 +290,6 @@ class Dashboard {
                     </div>
                 </div>
                 <div class="checkbox-options">
-                    <div class="checkbox-option all-option">
-                        <label>
-                            <input type="checkbox" class="select-all-checkbox" data-filter="${containerId}">
-                            <span class="checkmark"></span>
-                            <span class="option-text">所有${filterName}</span>
-                        </label>
-                    </div>
                     ${sortedOptions.map(option => `
                         <div class="checkbox-option">
                             <label>
@@ -327,17 +320,14 @@ class Dashboard {
 
         // Select all functionality
         const selectAllBtn = container.querySelector('.select-all-btn');
-        const selectAllCheckbox = container.querySelector('.select-all-checkbox');
         const clearAllBtn = container.querySelector('.clear-all-btn');
-        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-checkbox)');
+        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]');
 
         // Select all button
         selectAllBtn.addEventListener('click', () => {
             individualCheckboxes.forEach(checkbox => {
                 checkbox.checked = true;
             });
-            selectAllCheckbox.checked = true;
-            selectAllCheckbox.indeterminate = false;
             this.updateFilterSelection(containerId);
         });
 
@@ -346,17 +336,6 @@ class Dashboard {
             individualCheckboxes.forEach(checkbox => {
                 checkbox.checked = false;
             });
-            selectAllCheckbox.checked = false;
-            selectAllCheckbox.indeterminate = false;
-            this.updateFilterSelection(containerId);
-        });
-
-        // Select all checkbox
-        selectAllCheckbox.addEventListener('change', (e) => {
-            individualCheckboxes.forEach(checkbox => {
-                checkbox.checked = e.target.checked;
-            });
-            selectAllCheckbox.indeterminate = false;
             this.updateFilterSelection(containerId);
         });
 
@@ -375,21 +354,13 @@ class Dashboard {
         const container = document.getElementById(containerId);
         if (!container) return;
         
-        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-checkbox)');
-        const selectAllCheckbox = container.querySelector('.select-all-checkbox');
+        const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]');
         const totalOptions = individualCheckboxes.length;
 
         // Get selected values
         const selectedValues = Array.from(individualCheckboxes)
             .filter(checkbox => checkbox.checked)
             .map(checkbox => checkbox.value);
-
-        // Update select all checkbox state
-        const allSelected = selectedValues.length === totalOptions;
-        const someSelected = selectedValues.length > 0 && selectedValues.length < totalOptions;
-        
-        selectAllCheckbox.checked = allSelected;
-        selectAllCheckbox.indeterminate = someSelected;
 
         // Update the corresponding selected arrays
         if (containerId === 'wasteCategoryFilter') {
@@ -424,9 +395,8 @@ class Dashboard {
             countElement.className = 'selected-count all-selected';
         } else {
             countElement.className = 'selected-count some-selected';
-        }
     }
-
+    }
     // ... [Keep all your existing methods for setupUI, setupEventListeners, loadNavigation, etc.]
     
     setupUI() {
@@ -714,4 +684,5 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Creating dashboard instance...');
     window.dashboard = new Dashboard();
 });
+
 
