@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轉運站數據儀表板</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/header.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/stats-cards.css">
+    <link rel="stylesheet" href="css/charts.css">
+    <link rel="stylesheet" href="css/table.css">
+    <link rel="stylesheet" href="css/utilities.css">
+    <link rel="icon" href="assets/favicon.ico">
+</head>
+<body>
+    <div class="sidebar-layout">
+        <div class="sidebar">
+            <div class="logo-section">
+                <img src="assets/my-logo.png" alt="Logo" class="sidebar-logo">
+                <div class="user-info">
+                    <span id="userFullName"></span>
+                    <small id="userRole"></small>
+                </div>
+            </div>
+            
+            <nav id="sidebarNav" class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-title">我的轉運站</div>
+                </div>
+                
+                <div class="nav-section admin-section hidden" id="adminSection">
+                    <div class="nav-title">所有轉運站</div>
+                </div>
+            </nav>
+        </div>
+        
+        <div class="main-content">
+            <header class="header">
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>日期範圍:</label>
+                        <select id="dateRangeFilter">
+                            <option value="1month">1 個月</option>
+                            <option value="3months">3 個月</option>
+                            <option value="6months">6 個月</option>
+                            <option value="1year" selected>1 年</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>廢物類別:</label>
+                        <select id="wasteCategoryFilter">
+                            <option value="">所有類別</option>
+                            <option value="P01.00">P01.00</option>
+                            <option value="P05.00">P05.00</option>
+                            <option value="D01.00">D01.00</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>來源地區:</label>
+                        <select id="sourceFilter">
+                            <option value="">所有地區</option>
+                            <option value="葵青區">葵青區</option>
+                            <option value="深水埗區">深水埗區</option>
+                            <option value="灣仔區">灣仔區</option>
+                            <option value="荃灣區">荃灣區</option>
+                            <option value="觀塘區">觀塘區</option>
+                        </select>
+                    </div>
+                    <button id="applyFilters" class="filter-btn">應用篩選</button>
+                    <button id="compareBtn" class="filter-btn secondary">比較所有轉運站</button>
+                </div>
+                
+                <div class="user-section">
+                    <span id="currentUser"></span>
+                    <button id="logout" class="logout-btn">登出</button>
+                </div>
+            </header>
+            
+            <main class="content-area">
+                <div class="welcome-page" id="welcomePage">
+                    <div class="welcome-content">
+                        <img src="assets/my-logo.png" alt="Logo" class="logo-large">
+                        <h1>歡迎使用轉運站數據儀表板</h1>
+                        <p>請應用篩選條件以查看您的數據</p>
+                        <div class="welcome-features">
+                            <div class="feature-card">
+                                <h3>📊 實時數據</h3>
+                                <p>即時查看轉運站運營數據</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>📈 分析報告</h3>
+                                <p>深度分析廢物處理趨勢</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>🔍 多維篩選</h3>
+                                <p>按時間、地區、類別篩選數據</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-content hidden" id="dashboardContent">
+                    <section class="section">
+                        <h2 class="section-title">統計概覽</h2>
+                        <div class="stats-grid" id="statsCards">
+                            <!-- Stats cards will be populated here -->
+                        </div>
+                    </section>
+                    
+                    <section class="section">
+                        <h2 class="section-title">數據圖表</h2>
+                        <div class="charts-container" id="chartsContainer">
+                            <!-- Charts will be rendered here -->
+                        </div>
+                    </section>
+                    
+                    <section class="section">
+                        <div class="table-header">
+                            <h2 class="section-title">交易記錄</h2>
+                            <button id="exportCSV" class="export-btn">📥 導出 CSV</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>轉運站</th>
+                                        <th>日期</th>
+                                        <th>交收狀態</th>
+                                        <th>車輛任務</th>
+                                        <th>入磅時間</th>
+                                        <th>物料重量 (噸)</th>
+                                        <th>廢物類別</th>
+                                        <th>來源</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dataTable">
+                                    <!-- Table data will be populated here -->
+                                </tbody>
+                            </table>
+                            <div class="table-pagination">
+                                <div class="pagination-info" id="paginationInfo"></div>
+                                <div class="pagination-controls" id="paginationControls"></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/mobile-nav.js"></script>
+</body>
+</html>

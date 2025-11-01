@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Station Dashboard - Login</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="icon" href="assets/favicon.ico">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-header">
+            <img src="assets/my-logo.png" alt="Company Logo" class="login-logo">
+            <h1>轉運站數據儀表板</h1>
+            <p>Transfer Station Dashboard</p>
+        </div>
+        
+        <form id="loginForm" class="login-form">
+            <div class="form-group">
+                <label for="username">轉運站:</label>
+                <select id="username" required>
+                    <option value="">選擇您的轉運站</option>
+                    <option value="IETS">IETS - 港島東轉運站</option>
+                    <option value="IWTS">IWTS - 港島西轉運站</option>
+                    <option value="NLTS">NLTS - 北大嶼山轉運站</option>
+                    <option value="NWNNTS">NWNNTS - 西北新界轉運站</option>
+                    <option value="OITF">OITF - 離島轉運設施</option>
+                    <option value="STTS">STTS - 沙田轉運站</option>
+                    <option value="WKTS">WKTS - 西九龍轉運站 (管理員)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">密碼:</label>
+                <input type="password" id="password" required placeholder="輸入您的密碼">
+            </div>
+            
+            <button type="submit" class="login-btn">登入儀表板</button>
+        </form>
+        
+        <div class="login-footer">
+            <p>香港轉運站管理系統 © 2024</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>
