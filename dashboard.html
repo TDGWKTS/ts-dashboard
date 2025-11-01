@@ -1,23 +1,40 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>轉運站數據儀表板</title>
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/sidebar.css">
-    <link rel="stylesheet" href="css/header.css">
-    <link rel="stylesheet" href="css/dashboard.css">
-    <link rel="stylesheet" href="css/stats-cards.css">
-    <link rel="stylesheet" href="css/charts.css">
-    <link rel="stylesheet" href="css/table.css">
-    <link rel="stylesheet" href="css/utilities.css">
-    <link rel="icon" href="assets/favicon.ico">
+    <!-- Fixed CSS paths - remove css/ prefix -->
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="layout.css">
+    <link rel="stylesheet" href="sidebar.css">
+    <link rel="stylesheet" href="header.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="stats-cards.css">
+    <link rel="stylesheet" href="charts.css">
+    <link rel="stylesheet" href="table.css">
+    <link rel="stylesheet" href="utilities.css">
+    <link rel="icon" href="my-logo.png">
 </head>
 <body>
+    <!-- Immediate authentication check -->
+    <script>
+        // IMMEDIATE redirect if not authenticated - don't wait for DOMContentLoaded
+        const currentUser = localStorage.getItem('ts_user');
+        if (!currentUser) {
+            window.location.href = 'index.html';
+        }
+    </script>
+
     <div class="sidebar-layout">
-        <div class="sidebar">
+        <!-- Mobile Navigation Header -->
+        <div class="mobile-header hidden">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+            <div class="mobile-logo">🏭 TS Dashboard</div>
+            <div class="mobile-user" id="mobileUser"></div>
+        </div>
+
+        <div class="sidebar" id="sidebar">
             <div class="logo-section">
                 <div class="logo-text">🏭 TS Dashboard</div>
                 <div class="user-info">
@@ -70,7 +87,7 @@
                         </select>
                     </div>
                     <button id="applyFilters" class="filter-btn">應用篩選</button>
-                    <button id="compareBtn" class="filter-btn secondary">比較所有轉運站</button>
+                    <button id="compareBtn" class="filter-btn secondary hidden">比較所有轉運站</button>
                 </div>
                 
                 <div class="user-section">
@@ -80,11 +97,20 @@
             </header>
             
             <main class="content-area">
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="global-loader hidden">
+                    <div class="loader-content">
+                        <div class="spinner"></div>
+                        <p>加載數據中...</p>
+                        <small>一年數據可能需要 10-15 秒</small>
+                    </div>
+                </div>
+
                 <div class="welcome-page" id="welcomePage">
                     <div class="welcome-content">
                         <div class="logo-text large">🏭 TS Dashboard</div>
                         <h1>歡迎使用轉運站數據儀表板</h1>
-                        <p>請應用篩選條件以查看您的數據</p>
+                        <p>請從左側選擇轉運站以查看數據</p>
                         <div class="welcome-features">
                             <div class="feature-card">
                                 <h3>📊 實時數據</h3>
@@ -152,11 +178,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="js/dashboard.js"></script>
-    <script src="js/mobile-nav.js"></script>
+    <script src="dashboard.js"></script>
+    <script src="mobile-nav.js"></script>
+
+    <!-- Global error handler -->
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+        });
+    </script>
 </body>
-
 </html>
-
-
-
