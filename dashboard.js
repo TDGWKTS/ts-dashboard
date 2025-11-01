@@ -1,4 +1,4 @@
-// dashboard.js - Connected to real Google Sheets data
+// dashboard.js - Frontend JavaScript only
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -29,7 +29,6 @@ class Dashboard {
             this.setupUI();
             this.setupEventListeners();
             this.loadNavigation();
-            this.initMobileNavigation();
             
             if (this.isAdmin) {
                 this.setupComparisonFilters();
@@ -42,17 +41,37 @@ class Dashboard {
         }
     }
 
-    // REAL DATA METHODS - Replace mock data with actual API calls
+    async loadTSConfig() {
+        try {
+            const response = await fetch(`${API_URL}?action=getTSConfig&user=${this.currentUser}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                this.tsConfig = result.tsConfig;
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error loading TS config:', error);
+            // Fallback config
+            this.tsConfig = {
+                'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
+                'WKTS': { name: '西九龍轉運站', color: '#98D8C8', isAdmin: true }
+            };
+        }
+    }
 
+    // Use the CORRECT API endpoints that exist in your code.gs
     async loadSingleTSData(filters = {}, page = 1) {
-        console.log('Loading REAL single station data:', this.selectedTS, filters, 'Page:', page);
+        console.log('Loading single station data:', this.selectedTS, filters, 'Page:', page);
         
         this.showLoading(true);
         this.showSkeletonUI();
         this.currentPage = page;
         
         try {
-            const response = await fetch(`${API_URL}?action=getStationData&station=${this.selectedTS}&filters=${JSON.stringify(filters)}&page=${page}&pageSize=${this.pageSize}`);
+            // Use getTSData endpoint which exists in your code.gs
+            const response = await fetch(`${API_URL}?action=getTSData&user=${this.currentUser}&targetTS=${this.selectedTS}&filters=${JSON.stringify(filters)}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -61,23 +80,26 @@ class Dashboard {
             const result = await response.json();
             
             if (result.success) {
-                this.renderRealSingleTSData(result.data, filters, page);
+                this.renderSingleTSData(result.data, filters, page);
             } else {
                 throw new Error(result.error || 'Failed to load data');
             }
             
         } catch (error) {
-            console.error('Error loading real TS data:', error);
+            console.error('Error loading TS data:', error);
             this.showError('加載數據失敗: ' + error.message);
-            // Fallback to demo data if API fails
-            await this.loadMockSingleTSData(filters, page);
         } finally {
             this.showLoading(false);
         }
     }
     
     async loadComparisonData(filters = {}, page = 1) {
-        console.log('Loading REAL comparison data with filters:', filters, 'Page:', page);
+        if (!this.isAdmin) {
+            this.showError('只有管理員可以查看比較數據');
+            return;
+        }
+        
+        console.log('Loading comparison data with filters:', filters, 'Page:', page);
         
         this.showLoading(true);
         this.showSkeletonUI();
@@ -85,74 +107,76 @@ class Dashboard {
         this.currentPage = page;
         
         try {
-            const response = await fetch(`${API_URL}?action=getComparisonData&user=${this.currentUser}&filters=${JSON.stringify(filters)}&page=${page}&pageSize=${this.pageSize}`);
+            // Use getComparisonStats endpoint which exists in your code.gs
+            const [statsResponse, tableResponse] = await Promise.all([
+                fetch(`${API_URL}?action=getComparisonStats&user=${this.currentUser}&filters=${JSON.stringify(filters)}`),
+                fetch(`${API_URL}?action=getComparisonTable&user=${this.currentUser}&filters=${JSON.stringify(filters)}&page=${page}&pageSize=${this.pageSize}`)
+            ]);
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (!statsResponse.ok || !tableResponse.ok) {
+                throw new Error('HTTP error loading comparison data');
             }
             
-            const result = await response.json();
+            const statsResult = await statsResponse.json();
+            const tableResult = await tableResponse.json();
             
-            if (result.success) {
-                this.renderRealComparisonData(result.data, filters, page);
+            if (statsResult.success && tableResult.success) {
+                this.renderComparisonData(statsResult.data, tableResult.data, filters, page);
             } else {
-                throw new Error(result.error || 'Failed to load comparison data');
+                throw new Error('Failed to load comparison data');
             }
             
         } catch (error) {
-            console.error('Error loading real comparison data:', error);
+            console.error('Error loading comparison data:', error);
             this.showError('加載比較數據失敗: ' + error.message);
-            // Fallback to demo data if API fails
-            await this.loadMockComparisonData(filters, page);
         } finally {
             this.showLoading(false);
         }
     }
 
-    async renderRealSingleTSData(data, filters, page) {
-        // Render real stats
-        await this.loadRealStats(data.stats || data);
+    async renderSingleTSData(data, filters, page) {
+        // Render stats
+        await this.loadStats(data);
         
-        // Render real charts
-        await this.loadRealCharts(data.charts || data);
-        
-        // Render real table data
-        await this.loadRealTableData(data.table || data.records || data, filters, page);
+        // Render table data
+        await this.loadTableData(data, filters, page);
     }
 
-    async renderRealComparisonData(data, filters, page) {
-        // Render real comparison stats
-        await this.loadComparisonStats(data.stats || data);
+    async renderComparisonData(statsData, tableData, filters, page) {
+        // Render comparison stats
+        await this.loadComparisonStats(statsData);
         
-        // Render real comparison charts
-        await this.loadComparisonCharts(data.charts || data);
-        
-        // Render real comparison table
-        await this.loadComparisonTable(data.table || data.records || data, filters, page);
+        // Render comparison table
+        await this.loadComparisonTable(tableData, filters, page);
     }
 
-    async loadRealStats(statsData) {
+    async loadStats(data) {
         const statsElement = document.getElementById('statsCards');
         if (!statsElement) return;
         
-        if (!statsData || Object.keys(statsData).length === 0) {
+        if (!data || data.length === 0) {
             statsElement.innerHTML = '<div class="no-data">沒有統計數據</div>';
             return;
         }
         
-        // Adjust based on your actual API response structure
+        // Calculate basic stats from the data
+        const weights = data.map(item => parseFloat(item.物料重量) || 0).filter(w => w > 0);
+        const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+        const avgWeight = weights.length ? totalWeight / weights.length : 0;
+        const maxWeight = weights.length ? Math.max(...weights) : 0;
+        
         const statsHTML = `
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="ts-color" style="background-color: ${this.tsConfig[this.selectedTS]?.color || '#666'}"></span>
                     <h3>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</h3>
                 </div>
-                <div class="stat-value">${statsData.totalTransactions?.toLocaleString() || '0'}</div>
+                <div class="stat-value">${data.length.toLocaleString()}</div>
                 <div class="stat-label">總交易數</div>
                 <div class="stat-secondary">
-                    <div>總重量: ${statsData.totalWeight?.toLocaleString() || '0'} 噸</div>
-                    <div>平均: ${statsData.avgWeight?.toLocaleString() || '0'} 噸</div>
-                    <div>最高: ${statsData.maxWeight?.toLocaleString() || '0'} 噸</div>
+                    <div>總重量: ${totalWeight.toFixed(1)} 噸</div>
+                    <div>平均: ${avgWeight.toFixed(1)} 噸</div>
+                    <div>最高: ${maxWeight.toFixed(1)} 噸</div>
                 </div>
             </div>
         `;
@@ -160,68 +184,35 @@ class Dashboard {
         statsElement.innerHTML = statsHTML;
     }
 
-    async loadRealCharts(chartData) {
-        const chartsContainer = document.getElementById('chartsContainer');
-        if (!chartsContainer) return;
+    async loadComparisonStats(statsData) {
+        const statsElement = document.getElementById('statsCards');
+        if (!statsElement) return;
         
-        if (!chartData || Object.keys(chartData).length === 0) {
-            chartsContainer.innerHTML = '<div class="no-data">沒有圖表數據</div>';
+        if (!statsData || statsData.length === 0) {
+            statsElement.innerHTML = '<div class="no-data">沒有統計數據</div>';
             return;
         }
         
-        // Render charts based on your actual data structure
-        chartsContainer.innerHTML = `
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>月度趨勢 - ${this.selectedTS}</h3>
+        const statsHTML = statsData.map(ts => `
+            <div class="stat-card ${ts.tsCode.toLowerCase()}">
+                <div class="stat-header">
+                    <span class="ts-color" style="background-color: ${ts.color}"></span>
+                    <h3>${ts.tsName}</h3>
                 </div>
-                <div class="chart-wrapper">
-                    <canvas id="realTrendChart"></canvas>
-                </div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>廢物類別分佈</h3>
-                </div>
-                <div class="chart-wrapper">
-                    <canvas id="realDistributionChart"></canvas>
+                <div class="stat-value">${ts.stats.totalTransactions.toLocaleString()}</div>
+                <div class="stat-label">總交易數</div>
+                <div class="stat-secondary">
+                    <div>總重量: ${ts.stats.totalWeight.toLocaleString()} 噸</div>
+                    <div>平均: ${ts.stats.avgWeight.toLocaleString()} 噸</div>
+                    <div>最高: ${ts.stats.maxWeight.toLocaleString()} 噸</div>
                 </div>
             </div>
-        `;
+        `).join('');
         
-        // Render actual charts with real data
-        this.renderRealCharts(chartData);
+        statsElement.innerHTML = statsHTML;
     }
 
-    renderRealCharts(chartData) {
-        // Monthly trends chart with real data
-        const trendCtx = document.getElementById('realTrendChart')?.getContext('2d');
-        if (trendCtx && chartData.monthlyTrends) {
-            new Chart(trendCtx, {
-                type: 'line',
-                data: chartData.monthlyTrends,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        }
-        
-        // Distribution chart with real data
-        const distCtx = document.getElementById('realDistributionChart')?.getContext('2d');
-        if (distCtx && chartData.wasteDistribution) {
-            new Chart(distCtx, {
-                type: 'doughnut',
-                data: chartData.wasteDistribution,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        }
-    }
-
-    async loadRealTableData(tableData, filters, page) {
+    async loadTableData(tableData, filters, page) {
         const tableBody = document.getElementById('dataTable');
         if (!tableBody) return;
         
@@ -230,108 +221,125 @@ class Dashboard {
             return;
         }
         
-        // Render table with real data
         const tableHTML = tableData.map(record => `
             <tr>
-                <td>${record.TS_Name || record.station || this.tsConfig[this.selectedTS]?.name}</td>
-                <td>${record.日期 || record.date || ''}</td>
-                <td>${record.交收狀態 || record.status || ''}</td>
-                <td>${record.車輛任務 || record.vehicleTask || ''}</td>
-                <td>${record.入磅時間 || record.weighTime || ''}</td>
-                <td>${record.物料重量 || record.weight || ''}</td>
-                <td>${record.廢物類別 || record.wasteCategory || ''}</td>
-                <td>${record.來源 || record.source || ''}</td>
+                <td>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</td>
+                <td>${record.日期 || ''}</td>
+                <td>${record.交收狀態 || ''}</td>
+                <td>${record.車輛任務 || ''}</td>
+                <td>${record.入磅時間 || ''}</td>
+                <td>${record.物料重量 || ''}</td>
+                <td>${record.廢物類別 || ''}</td>
+                <td>${record.來源 || ''}</td>
             </tr>
         `).join('');
         
         tableBody.innerHTML = tableHTML;
         
-        // Setup pagination with real data
         this.setupPagination({
             currentPage: page,
-            totalPages: Math.ceil((tableData.totalRecords || tableData.length) / this.pageSize),
-            totalRecords: tableData.totalRecords || tableData.length,
+            totalPages: 1,
+            totalRecords: tableData.length,
             pageSize: this.pageSize
         }, filters);
     }
 
-    // Update your Google Apps Script to handle these new actions
-
-    async loadDynamicFilters() {
-        try {
-            const response = await fetch(`${API_URL}?action=getFilterOptions`);
-            
-            if (response.ok) {
-                const result = await response.json();
-                
-                if (result.success) {
-                    this.populateDynamicFilters(result.data);
-                    return;
-                }
-            }
-        } catch (error) {
-            console.warn('API load failed, using demo filters:', error);
-        }
+    async loadComparisonTable(tableData, filters, page) {
+        const tableBody = document.getElementById('dataTable');
+        if (!tableBody) return;
         
-        // If API fails, try to extract filters from actual data
-        await this.extractFiltersFromData();
-    }
-
-    async extractFiltersFromData() {
-        try {
-            // Load a small sample of data to extract unique values
-            const response = await fetch(`${API_URL}?action=getAllData&limit=1000`);
-            
-            if (response.ok) {
-                const result = await response.json();
-                
-                if (result.success && result.data) {
-                    const wasteCategories = [...new Set(result.data.map(item => item.廢物類別).filter(Boolean))].sort();
-                    const sourceRegions = [...new Set(result.data.map(item => item.來源地區).filter(Boolean))].sort();
-                    
-                    this.populateDynamicFilters({
-                        wasteCategories: wasteCategories,
-                        sourceRegions: sourceRegions
-                    });
-                    return;
-                }
-            }
-        } catch (error) {
-            console.warn('Failed to extract filters from data:', error);
-        }
-        
-        // Final fallback to demo filters
-        await this.loadDemoFilters();
-    }
-
-    // Keep your existing methods but ensure they call REAL data methods
-    async applyFilters() {
-        if (!this.selectedTS) {
-            this.showError('請先選擇轉運站');
+        if (!tableData.data || tableData.data.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="8" class="no-data">沒有找到記錄</td></tr>';
             return;
         }
         
-        const filters = this.getCurrentFilters();
-        console.log('Applying REAL filters:', filters);
+        const tableHTML = tableData.data.map(record => `
+            <tr>
+                <td>${record.TS_Name || record.TS_Code || ''}</td>
+                <td>${record.日期 || ''}</td>
+                <td>${record.交收狀態 || ''}</td>
+                <td>${record.車輛任務 || ''}</td>
+                <td>${record.入磅時間 || ''}</td>
+                <td>${record.物料重量 || ''}</td>
+                <td>${record.廢物類別 || ''}</td>
+                <td>${record.來源 || ''}</td>
+            </tr>
+        `).join('');
         
-        if (this.selectedTS === 'comparison') {
-            await this.loadComparisonData(filters);
-        } else {
-            await this.loadSingleTSData(filters);
+        tableBody.innerHTML = tableHTML;
+        
+        this.setupPagination(tableData.pagination, filters);
+    }
+
+    // Add all your other existing methods here...
+    // setupUI(), setupEventListeners(), loadNavigation(), etc.
+    
+    setupPagination(pagination, filters) {
+        const infoElement = document.getElementById('paginationInfo');
+        const controlsElement = document.getElementById('paginationControls');
+        
+        if (infoElement) {
+            const startRecord = ((pagination.currentPage - 1) * pagination.pageSize) + 1;
+            const endRecord = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalRecords);
+            infoElement.textContent = `顯示 ${startRecord}-${endRecord} 條，共 ${pagination.totalRecords.toLocaleString()} 條記錄`;
+        }
+        
+        if (controlsElement) {
+            let controlsHTML = '';
+            
+            if (pagination.currentPage > 1) {
+                controlsHTML += `<button class="pagination-btn" data-page="${pagination.currentPage - 1}">上一頁</button>`;
+            }
+            
+            controlsHTML += `<span class="pagination-info">第 ${pagination.currentPage} 頁，共 ${pagination.totalPages} 頁</span>`;
+            
+            if (pagination.currentPage < pagination.totalPages) {
+                controlsHTML += `<button class="pagination-btn" data-page="${pagination.currentPage + 1}">下一頁</button>`;
+            }
+            
+            controlsElement.innerHTML = controlsHTML;
+            
+            controlsElement.querySelectorAll('.pagination-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const page = parseInt(e.target.getAttribute('data-page'));
+                    if (this.selectedTS === 'comparison') {
+                        this.loadComparisonData(filters, page);
+                    } else {
+                        this.loadSingleTSData(filters, page);
+                    }
+                });
+            });
         }
     }
 
-    // ... (keep all your existing UI, navigation, and utility methods)
-
-    // DEMO DATA FALLBACKS (only used when real API fails)
-    async loadMockSingleTSData(filters, page = 1) {
-        console.warn('Using demo data as fallback');
-        // ... your existing mock data implementation
+    showLoading(show) {
+        let loader = document.getElementById('loadingIndicator');
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'loadingIndicator';
+            loader.className = 'global-loader hidden';
+            loader.innerHTML = `
+                <div class="loader-content">
+                    <div class="spinner"></div>
+                    <p>加載數據中...</p>
+                    <small>一年數據可能需要 10-15 秒</small>
+                </div>
+            `;
+            document.body.appendChild(loader);
+        }
+        loader.classList.toggle('hidden', !show);
     }
 
-    async loadMockComparisonData(filters, page = 1) {
-        console.warn('Using demo comparison data as fallback');
-        // ... your existing mock comparison data implementation
+    showSkeletonUI() {
+        const statsCards = document.getElementById('statsCards');
+        const dataTable = document.getElementById('dataTable');
+        
+        if (statsCards) statsCards.innerHTML = '<div class="stat-skeleton"></div>';
+        if (dataTable) dataTable.innerHTML = '<tr><td colspan="8"><div class="skeleton-cell"></div></td></tr>';
+    }
+    
+    showError(message) {
+        alert('錯誤: ' + message);
     }
 }
 
