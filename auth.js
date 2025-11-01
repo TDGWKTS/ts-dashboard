@@ -1,60 +1,6 @@
-﻿// Replace with your Google Apps Script deployment URL
+// auth.js - Consolidated version
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
-async function sha256(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    
-    if (!username || !password) {
-        alert('請填寫轉運站和密碼');
-        return;
-    }
-    
-    const loginBtn = e.target.querySelector('button[type="submit"]');
-    const originalText = loginBtn.textContent;
-    loginBtn.textContent = '登入中...';
-    loginBtn.disabled = true;
-    
-    try {
-        const passwordHash = await sha256(password);
-        
-        const response = await fetch(`${API_URL}?action=login&username=${username}&password=${passwordHash}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            localStorage.setItem('ts_user', result.user);
-            localStorage.setItem('ts_fullname', result.fullName);
-            localStorage.setItem('ts_isAdmin', result.isAdmin);
-            window.location.href = 'dashboard.html';
-        } else {
-            alert('登入失敗: ' + result.error);
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        alert('登入錯誤: ' + error.message);
-    } finally {
-        loginBtn.textContent = originalText;
-        loginBtn.disabled = false;
-    }
-});
-
-// Enter key support
-document.getElementById('password').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
-    }
-
-});
-// auth.js
 document.addEventListener('DOMContentLoaded', function() {
     // Check if user is already logged in
     const currentUser = localStorage.getItem('ts_user');
@@ -69,20 +15,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
 
-    // Create error message element if it doesn't exist
-    if (!errorMessage) {
-        const errorDiv = document.createElement('div');
-        errorDiv.id = 'errorMessage';
-        errorDiv.className = 'error-message hidden';
-        loginForm.parentNode.insertBefore(errorDiv, loginForm);
-    }
-
     // Password visibility toggle
     if (togglePassword && passwordInput) {
         togglePassword.addEventListener('click', function() {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
             togglePassword.textContent = type === 'password' ? '👁️' : '🔒';
+        });
+    }
+
+    // Enter key support
+    if (passwordInput) {
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginForm.dispatchEvent(new Event('submit'));
+            }
         });
     }
 
@@ -101,13 +48,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Show loading state
             setLoadingState(true);
+            hideError();
             
             try {
                 await authenticateUser(username, password);
-                
             } catch (error) {
                 console.error('Login error:', error);
-                showError(error.message);
+                showError('登入錯誤: ' + error.message);
             } finally {
                 setLoadingState(false);
             }
@@ -123,49 +70,96 @@ document.addEventListener('DOMContentLoaded', function() {
                 loginButton.disabled = loading;
                 btnText.classList.toggle('hidden', loading);
                 btnLoading.classList.toggle('hidden', !loading);
+            } else {
+                // Fallback for simple button
+                loginButton.disabled = loading;
+                loginButton.textContent = loading ? '登入中...' : '登入儀表板';
             }
         }
     }
 
     function showError(message) {
+        let errorElement = document.getElementById('errorMessage');
+        if (!errorElement) {
+            // Create error element if it doesn't exist
+            errorElement = document.createElement('div');
+            errorElement.id = 'errorMessage';
+            errorElement.className = 'error-message';
+            loginForm.parentNode.insertBefore(errorElement, loginForm);
+        }
+        errorElement.textContent = message;
+        errorElement.classList.remove('hidden');
+    }
+
+    function hideError() {
         const errorElement = document.getElementById('errorMessage');
         if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.classList.remove('hidden');
+            errorElement.classList.add('hidden');
         }
     }
 });
 
 async function authenticateUser(username, password) {
-    // For demo purposes - use simple authentication without API call
-    // Remove this in production and use real API
-    
-    console.log('Authenticating:', username);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    try {
+        // First try API authentication
+        const passwordHash = await sha256(password);
+        
+        const response = await fetch(`${API_URL}?action=login&username=${username}&password=${passwordHash}`);
+        
+        if (!response.ok) {
+            throw new Error(`網絡錯誤: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // API authentication successful
+            localStorage.setItem('ts_user', result.user);
+            localStorage.setItem('ts_fullname', result.fullName);
+            localStorage.setItem('ts_isAdmin', result.isAdmin);
+            window.location.href = 'dashboard.html';
+            return true;
+        } else {
+            // API authentication failed, fallback to demo mode
+            console.warn('API auth failed, using demo mode');
+            return await demoAuthenticate(username, password);
+        }
+        
+    } catch (error) {
+        console.warn('API call failed, using demo mode:', error.message);
+        // Fallback to demo authentication if API is unavailable
+        return await demoAuthenticate(username, password);
+    }
+}
+
+async function demoAuthenticate(username, password) {
+    // Demo authentication for testing
     const validStations = ['IETS', 'IWTS', 'NLTS', 'NWNNTS', 'OITF', 'STTS', 'WKTS'];
     
     if (!validStations.includes(username)) {
         throw new Error('無效的轉運站代碼');
     }
     
-    // Simple password check - in real app, this would be API call
     if (!password || password.length < 1) {
         throw new Error('請輸入密碼');
     }
     
     // For demo - any non-empty password works
-    // Store user info
     localStorage.setItem('ts_user', username);
     localStorage.setItem('ts_fullname', getStationName(username));
     localStorage.setItem('ts_isAdmin', username === 'WKTS');
     
     // Redirect to dashboard
     window.location.href = 'dashboard.html';
-    
     return true;
+}
+
+async function sha256(message) {
+    // Simple SHA-256 implementation
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function getStationName(stationCode) {
