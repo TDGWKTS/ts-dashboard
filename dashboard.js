@@ -1,279 +1,842 @@
-// auth.js - Fixed version with better error handling
+// dashboard.js - Complete Fixed Version
 const API_URL = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔐 Auth.js loaded - Checking authentication status...');
-    
-    // Check if user is already logged in
-    const currentUser = localStorage.getItem('ts_user');
-    console.log('📋 Current user in localStorage:', currentUser);
-    
-    const isLoginPage = window.location.pathname.includes('index.html') || 
-                       window.location.pathname === '/' || 
-                       window.location.pathname.endsWith('/');
-    
-    // If user is logged in AND we're on login page, redirect to dashboard
-    if (currentUser && isLoginPage) {
-        console.log('✅ User already logged in, redirecting to dashboard...');
-        window.location.href = 'dashboard.html';
-        return;
-    }
-    
-    // If user is NOT logged in AND we're on dashboard, redirect to login
-    if (!currentUser && window.location.pathname.includes('dashboard.html')) {
-        console.log('❌ No user logged in, redirecting to login...');
-        window.location.href = 'index.html';
-        return;
-    }
-
-    // Only set up login form if we're on login page
-    if (isLoginPage) {
-        console.log('🔄 Setting up login form...');
-        setupLoginForm();
-    }
-});
-
-function setupLoginForm() {
-    const loginForm = document.getElementById('loginForm');
-    const errorMessage = document.getElementById('errorMessage');
-
-    if (!loginForm) {
-        console.error('❌ Login form not found');
-        return;
-    }
-
-    console.log('✅ Login form found');
-
-    // Create error message element if it doesn't exist
-    if (!errorMessage) {
-        const errorDiv = document.createElement('div');
-        errorDiv.id = 'errorMessage';
-        errorDiv.className = 'error-message hidden';
-        loginForm.parentNode.insertBefore(errorDiv, loginForm);
-    }
-
-    // Form submission
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        console.log('📤 Login form submitted');
+class Dashboard {
+    constructor() {
+        this.currentUser = localStorage.getItem('ts_user');
+        this.userFullName = localStorage.getItem('ts_fullname');
+        this.isAdmin = localStorage.getItem('ts_isAdmin') === 'true';
+        this.currentData = [];
+        this.tsConfig = {};
+        this.comparisonData = {};
+        this.currentPage = 1;
+        this.pageSize = 50;
+        this.mobileNav = null;
+        this.selectedTS = null;
         
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
+        console.log('Dashboard initialized:', {
+            user: this.currentUser,
+            fullName: this.userFullName,
+            isAdmin: this.isAdmin
+        });
+        
+        if (!this.currentUser) {
+            console.error('No user found, redirecting to login...');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        this.init();
+    }
+    
+    async init() {
+        try {
+            console.log('Starting dashboard initialization...');
+            await this.loadTSConfig();
+            await this.loadDynamicFilters();
+            this.setupUI();
+            this.setupEventListeners();
+            this.loadNavigation();
+            
+            if (this.isAdmin) {
+                this.setupComparisonFilters();
+            }
+            
+            this.autoSelectStation();
+            
+            console.log('Dashboard initialization complete');
+        } catch (error) {
+            console.error('Dashboard initialization failed:', error);
+            this.showError('儀表板初始化失敗: ' + error.message);
+        }
+    }
+    
+    autoSelectStation() {
+        if (!this.isAdmin && this.currentUser) {
+            this.selectedTS = this.currentUser;
+            console.log('Auto-selecting station for regular user:', this.selectedTS);
+            this.showFilterPanel();
+            // Don't auto-load data yet, wait for user to click
+        } else if (this.isAdmin) {
+            console.log('Admin user - waiting for manual station selection');
+            // Admin users need to select a station manually
+        }
+    }
+    
+    async loadTSConfig() {
+        try {
+            console.log('Loading TS configuration...');
+            // Use demo configuration for now
+            this.tsConfig = {
+                'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
+                'IWTS': { name: '港島西轉運站', color: '#4ECDC4', isAdmin: false },
+                'NLTS': { name: '北大嶼山轉運站', color: '#45B7D1', isAdmin: false },
+                'NWNNTS': { name: '西北新界轉運站', color: '#96CEB4', isAdmin: false },
+                'OITF': { name: '離島轉運設施', color: '#FFEAA7', isAdmin: false },
+                'STTS': { name: '沙田轉運站', color: '#DDA0DD', isAdmin: false },
+                'WKTS': { name: '西九龍轉運站', color: '#98D8C8', isAdmin: true }
+            };
+            console.log('TS Config loaded successfully:', this.tsConfig);
+        } catch (error) {
+            console.error('Error loading TS config:', error);
+        }
+    }
 
-        console.log('🔑 Login attempt:', { username, passwordLength: password ? password.length : 0 });
+    async loadDynamicFilters() {
+        try {
+            console.log('Loading dynamic filters...');
+            // Demo filters for now
+            const demoFilterData = {
+                wasteCategories: [
+                    'P01.00 - 都市固體廢物',
+                    'P05.00 - 建築廢料', 
+                    'D01.00 - 危險廢物',
+                    'C01.00 - 商業廢物',
+                    'C02.00 - 工業廢物',
+                    'M01.00 - 混合廢物'
+                ],
+                sourceRegions: [
+                    '中西區', '灣仔區', '東區', '南區',
+                    '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
+                    '葵青區', '荃灣區', '屯門區', '元朗區'
+                ]
+            };
+            
+            this.populateDynamicFilters(demoFilterData);
+        } catch (error) {
+            console.error('Error loading filters:', error);
+        }
+    }
 
-        if (!username || !password) {
-            showError('請填寫轉運站和密碼');
+    populateDynamicFilters(data) {
+        console.log('Populating dynamic filters:', data);
+        
+        // Populate Waste Category filter
+        const wasteCategoryFilter = document.getElementById('wasteCategoryFilter');
+        if (wasteCategoryFilter && data.wasteCategories) {
+            wasteCategoryFilter.innerHTML = '<option value="">所有類別</option>' +
+                data.wasteCategories.map(category => 
+                    `<option value="${category}">${category}</option>`
+                ).join('');
+        }
+
+        // Populate Source Region filter
+        const sourceFilter = document.getElementById('sourceFilter');
+        if (sourceFilter && data.sourceRegions) {
+            sourceFilter.innerHTML = '<option value="">所有地區</option>' +
+                data.sourceRegions.map(region => 
+                    `<option value="${region}">${region}</option>`
+                ).join('');
+        }
+    }
+    
+    setupUI() {
+        console.log('Setting up UI...');
+        
+        // Update user info in header
+        const currentUserElement = document.getElementById('currentUser');
+        const userFullNameElement = document.getElementById('userFullName');
+        const userRoleElement = document.getElementById('userRole');
+        
+        if (currentUserElement) {
+            currentUserElement.textContent = this.userFullName || this.currentUser;
+            console.log('Set currentUser:', this.userFullName || this.currentUser);
+        }
+        if (userFullNameElement) {
+            userFullNameElement.textContent = this.userFullName || this.currentUser;
+        }
+        if (userRoleElement) {
+            userRoleElement.textContent = this.isAdmin ? '管理員' : '轉運站用戶';
+            console.log('Set user role:', this.isAdmin ? '管理員' : '轉運站用戶');
+        }
+        
+        // Show admin sections if admin
+        if (this.isAdmin) {
+            const adminSection = document.getElementById('adminSection');
+            const compareBtn = document.getElementById('compareBtn');
+            
+            if (adminSection) {
+                adminSection.classList.remove('hidden');
+                console.log('Admin section shown');
+            }
+            if (compareBtn) {
+                compareBtn.classList.remove('hidden');
+                console.log('Compare button shown');
+            }
+        }
+        
+        console.log('UI setup complete');
+    }
+    
+    setupEventListeners() {
+        console.log('Setting up event listeners...');
+        
+        // Apply Filters button
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+            console.log('Apply filters listener added');
+        }
+        
+        // Compare button (admin only)
+        const compareBtn = document.getElementById('compareBtn');
+        if (compareBtn && this.isAdmin) {
+            compareBtn.addEventListener('click', () => this.loadComparisonData(this.getCurrentFilters()));
+            console.log('Compare button listener added');
+        }
+        
+        // Export CSV button
+        const exportCSVBtn = document.getElementById('exportCSV');
+        if (exportCSVBtn) {
+            exportCSVBtn.addEventListener('click', () => this.exportCSV());
+            console.log('Export CSV listener added');
+        }
+        
+        // Logout button - FIXED
+        const logoutBtn = document.getElementById('logout');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                console.log('Logout button clicked');
+                this.logout();
+            });
+            console.log('Logout button listener added');
+        } else {
+            console.error('Logout button not found in DOM!');
+        }
+        
+        // Date range filter
+        const dateRangeFilter = document.getElementById('dateRangeFilter');
+        if (dateRangeFilter) {
+            dateRangeFilter.addEventListener('change', () => this.handleDateRangeChange());
+            console.log('Date range filter listener added');
+        }
+        
+        this.setDefaultDates();
+        console.log('Event listeners setup complete');
+    }
+
+    handleDateRangeChange() {
+        const dateRangeType = document.getElementById('dateRangeFilter').value;
+        const customDateRange = document.getElementById('customDateRange');
+        const specificDateSelector = document.getElementById('specificDateSelector');
+        
+        console.log('Date range changed to:', dateRangeType);
+        
+        // Hide all custom date selectors first
+        if (customDateRange) customDateRange.classList.add('hidden');
+        if (specificDateSelector) specificDateSelector.classList.add('hidden');
+        
+        // Show relevant selector
+        if (dateRangeType === 'custom') {
+            if (customDateRange) {
+                customDateRange.classList.remove('hidden');
+                this.setDefaultCustomDates();
+            }
+        } else if (dateRangeType === 'specificDate') {
+            if (specificDateSelector) {
+                specificDateSelector.classList.remove('hidden');
+                this.setDefaultSpecificDate();
+            }
+        }
+    }
+
+    setDefaultDates() {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const specificDateInput = document.getElementById('specificDate');
+        
+        if (startDateInput) startDateInput.value = this.formatDateForInput(firstDay);
+        if (endDateInput) endDateInput.value = this.formatDateForInput(lastDay);
+        if (specificDateInput) specificDateInput.value = this.formatDateForInput(today);
+        
+        console.log('Default dates set');
+    }
+
+    setDefaultCustomDates() {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        
+        if (startDateInput) startDateInput.value = this.formatDateForInput(firstDay);
+        if (endDateInput) endDateInput.value = this.formatDateForInput(lastDay);
+    }
+
+    setDefaultSpecificDate() {
+        const today = new Date();
+        const specificDateInput = document.getElementById('specificDate');
+        
+        if (specificDateInput) specificDateInput.value = this.formatDateForInput(today);
+    }
+
+    formatDateForInput(date) {
+        return date.toISOString().split('T')[0];
+    }
+    
+    loadNavigation() {
+        console.log('Loading navigation...');
+        const nav = document.getElementById('sidebarNav');
+        if (!nav) {
+            console.error('Sidebar navigation element not found');
             return;
         }
 
-        // Show loading state
-        setLoadingState(true);
-        hideError();
-        
-        try {
-            await authenticateUser(username, password);
-        } catch (error) {
-            console.error('❌ Login error:', error);
-            showError(error.message);
-        } finally {
-            setLoadingState(false);
+        const myStationSection = nav.querySelector('.nav-section:first-child');
+        if (!myStationSection) {
+            console.error('My station section not found');
+            return;
         }
-    });
 
-    function setLoadingState(loading) {
-        const loginButton = document.getElementById('loginButton');
-        if (loginButton) {
-            loginButton.disabled = loading;
-            if (loading) {
-                loginButton.innerHTML = '<span>登入中...</span>';
+        // Clear existing navigation but keep the title
+        myStationSection.innerHTML = '<div class="nav-title">我的轉運站</div>';
+
+        console.log('Loading navigation for:', {
+            user: this.currentUser,
+            isAdmin: this.isAdmin,
+            availableStations: Object.keys(this.tsConfig)
+        });
+
+        let stationsAdded = 0;
+
+        // Create navigation links for each station
+        Object.keys(this.tsConfig).forEach(tsCode => {
+            const config = this.tsConfig[tsCode];
+            
+            const link = document.createElement('a');
+            link.href = '#';
+            link.className = 'nav-link';
+            link.innerHTML = `
+                <span class="ts-color" style="background-color: ${config.color}"></span>
+                <span class="ts-info">
+                    <strong>${tsCode}</strong>
+                    <small>${config.name}</small>
+                </span>
+            `;
+
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.selectTS(tsCode);
+            });
+
+            if (!this.isAdmin) {
+                // Regular user - only show their station
+                if (tsCode === this.currentUser) {
+                    myStationSection.appendChild(link);
+                    stationsAdded++;
+                    console.log('Added user station to navigation:', tsCode);
+                }
             } else {
-                loginButton.innerHTML = '<span class="btn-text">登入儀表板</span>';
+                // Admin user - show all stations
+                if (tsCode === this.currentUser) {
+                    // Admin's own station in "我的轉運站"
+                    myStationSection.appendChild(link);
+                    stationsAdded++;
+                    console.log('Added admin own station to navigation:', tsCode);
+                } else {
+                    // Other stations in "所有轉運站"
+                    this.addToAdminSection(tsCode, config, link);
+                    stationsAdded++;
+                }
             }
+        });
+
+        // Add comparison link for admin users
+        if (this.isAdmin) {
+            this.addComparisonLink();
+        }
+
+        console.log(`Navigation loaded: ${stationsAdded} stations added`);
+
+        if (stationsAdded === 0) {
+            myStationSection.innerHTML += '<div class="no-stations">沒有可用的轉運站</div>';
         }
     }
 
-    function showError(message) {
-        const errorElement = document.getElementById('errorMessage');
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.classList.remove('hidden');
-            console.log('❌ Error shown:', message);
+    addToAdminSection(tsCode, config, link) {
+        let adminSection = document.getElementById('adminSection');
+        if (!adminSection) {
+            console.error('Admin section not found');
+            return;
         }
-    }
 
-    function hideError() {
-        const errorElement = document.getElementById('errorMessage');
-        if (errorElement) {
-            errorElement.classList.add('hidden');
+        // Ensure admin section is visible
+        adminSection.classList.remove('hidden');
+
+        let navLinks = adminSection.querySelector('.nav-links');
+        if (!navLinks) {
+            navLinks = document.createElement('div');
+            navLinks.className = 'nav-links';
+            adminSection.appendChild(navLinks);
+            console.log('Created nav-links container in admin section');
         }
+
+        navLinks.appendChild(link);
+        console.log('Added station to admin section:', tsCode);
     }
 
-    console.log('✅ Login form setup complete');
-}
-
-async function authenticateUser(username, password) {
-    console.log('🔐 Starting authentication for:', username);
-    
-    try {
-        // For testing - use demo authentication first
-        console.log('🔄 Using demo authentication for testing...');
-        await demoAuthenticate(username, password);
-        
-    } catch (error) {
-        console.error('❌ Demo auth failed, trying API...', error);
-        
-        try {
-            // Try real API authentication
-            await apiAuthenticate(username, password);
-        } catch (apiError) {
-            console.error('❌ API authentication failed:', apiError);
-            throw new Error('無法連接到伺服器。請檢查網絡連接或稍後再試。');
+    addComparisonLink() {
+        const adminSection = document.getElementById('adminSection');
+        if (!adminSection) {
+            console.error('Admin section not found for comparison link');
+            return;
         }
-    }
-}
 
-// Demo authentication for testing
-async function demoAuthenticate(username, password) {
-    console.log('🎯 Using demo authentication');
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const validStations = ['IETS', 'IWTS', 'NLTS', 'NWNNTS', 'OITF', 'STTS', 'WKTS'];
-    
-    if (!validStations.includes(username)) {
-        throw new Error('無效的轉運站代碼');
-    }
-    
-    if (!password || password.length < 1) {
-        throw new Error('請輸入密碼');
-    }
-    
-    // For demo - any non-empty password works
-    const stationNames = {
-        'IETS': '港島東轉運站',
-        'IWTS': '港島西轉運站',
-        'NLTS': '北大嶼山轉運站',
-        'NWNNTS': '西北新界轉運站',
-        'OITF': '離島轉運設施',
-        'STTS': '沙田轉運站',
-        'WKTS': '西九龍轉運站'
-    };
-    
-    // Store user info
-    localStorage.setItem('ts_user', username);
-    localStorage.setItem('ts_fullname', stationNames[username] || username);
-    localStorage.setItem('ts_isAdmin', username === 'WKTS');
-    
-    console.log('✅ Demo login successful:', {
-        user: username,
-        fullName: stationNames[username],
-        isAdmin: username === 'WKTS'
-    });
-    
-    // Redirect to dashboard
-    window.location.href = 'dashboard.html';
-}
+        let navLinks = adminSection.querySelector('.nav-links');
+        if (!navLinks) {
+            navLinks = document.createElement('div');
+            navLinks.className = 'nav-links';
+            adminSection.appendChild(navLinks);
+        }
 
-// Real API authentication
-async function apiAuthenticate(username, password) {
-    console.log('🌐 Starting API authentication...');
-    
-    try {
-        const passwordHash = await sha256(password);
-        console.log('🔒 Password hashed');
+        const compareLink = document.createElement('a');
+        compareLink.href = '#';
+        compareLink.className = 'nav-link compare-link';
+        compareLink.innerHTML = `
+            <span class="ts-color" style="background-color: #666"></span>
+            <span class="ts-info">
+                <strong>比較所有轉運站</strong>
+                <small>多站數據對比</small>
+            </span>
+        `;
+
+        compareLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.selectTS('comparison');
+        });
+
+        navLinks.appendChild(compareLink);
+        console.log('Comparison link added to admin section');
+    }
+
+    async selectTS(tsCode) {
+        console.log('Selecting station:', tsCode);
         
-        const url = `${API_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(passwordHash)}`;
-        console.log('📡 API URL:', url);
-        
-        // Add timeout to fetch request
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            signal: controller.signal
+        // Remove active class from all links
+        document.querySelectorAll('#sidebarNav .nav-link').forEach(link => {
+            link.classList.remove('active');
         });
         
-        clearTimeout(timeoutId);
+        // Add active class to clicked link
+        event.target.closest('.nav-link').classList.add('active');
         
-        console.log('📨 API Response status:', response.status);
+        this.selectedTS = tsCode;
+        this.showFilterPanel();
         
-        if (!response.ok) {
-            throw new Error(`網絡錯誤 (HTTP ${response.status})`);
+        console.log('Loading data for station:', tsCode);
+        
+        if (tsCode === 'comparison') {
+            await this.loadComparisonData(this.getCurrentFilters());
+        } else {
+            await this.loadSingleTSData(this.getCurrentFilters());
+        }
+    }
+    
+    showFilterPanel() {
+        const welcomePage = document.getElementById('welcomePage');
+        const dashboardContent = document.getElementById('dashboardContent');
+        
+        if (welcomePage) welcomePage.classList.add('hidden');
+        if (dashboardContent) dashboardContent.classList.remove('hidden');
+        
+        console.log('Filter panel shown for station:', this.selectedTS);
+    }
+    
+    getCurrentFilters() {
+        const dateRangeType = document.getElementById('dateRangeFilter').value;
+        let dateRange;
+        
+        if (dateRangeType === 'custom') {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            dateRange = { type: 'custom', startDate, endDate };
+        } else if (dateRangeType === 'specificDate') {
+            const specificDate = document.getElementById('specificDate').value;
+            dateRange = { type: 'specificDate', date: specificDate };
+        } else {
+            dateRange = { type: dateRangeType };
         }
         
-        const result = await response.json();
-        console.log('📊 API Response data:', result);
+        const filters = {
+            dateRange: dateRange,
+            wasteCategory: document.getElementById('wasteCategoryFilter').value || '',
+            source: document.getElementById('sourceFilter').value || ''
+        };
         
-        if (result.success) {
-            // Store user info
-            localStorage.setItem('ts_user', result.user);
-            localStorage.setItem('ts_fullname', result.fullName);
-            localStorage.setItem('ts_isAdmin', result.isAdmin);
+        console.log('Current filters:', filters);
+        return filters;
+    }
+    
+    async applyFilters() {
+        if (!this.selectedTS) {
+            this.showError('請先選擇轉運站');
+            return;
+        }
+        
+        const filters = this.getCurrentFilters();
+        console.log('Applying filters:', filters);
+        
+        if (this.selectedTS === 'comparison') {
+            await this.loadComparisonData(filters);
+        } else {
+            await this.loadSingleTSData(filters);
+        }
+    }
+    
+    async loadSingleTSData(filters = {}, page = 1) {
+        console.log('Loading single station data:', this.selectedTS, filters, 'Page:', page);
+        
+        this.showLoading(true);
+        this.showSkeletonUI();
+        this.currentPage = page;
+        
+        try {
+            // Simulate API call with demo data
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.loadMockSingleTSData(filters, page);
+        } catch (error) {
+            console.error('Error loading single TS data:', error);
+            this.showError('加載數據失敗: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    async loadComparisonData(filters = {}, page = 1) {
+        if (!this.isAdmin) {
+            this.showError('只有管理員可以查看比較數據');
+            return;
+        }
+        
+        console.log('Loading comparison data with filters:', filters, 'Page:', page);
+        
+        this.showLoading(true);
+        this.showSkeletonUI();
+        this.selectedTS = 'comparison';
+        this.currentPage = page;
+        
+        try {
+            // Simulate API call with demo data
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            await this.loadMockComparisonData(filters, page);
+        } catch (error) {
+            console.error('Error loading comparison data:', error);
+            this.showError('加載比較數據失敗: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async loadMockSingleTSData(filters, page = 1) {
+        // Mock stats data
+        const statsElement = document.getElementById('statsCards');
+        if (statsElement) {
+            statsElement.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="ts-color" style="background-color: ${this.tsConfig[this.selectedTS]?.color || '#666'}"></span>
+                        <h3>${this.tsConfig[this.selectedTS]?.name || this.selectedTS}</h3>
+                    </div>
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-label">總交易數</div>
+                    <div class="stat-secondary">
+                        <div>總重量: 8,542 噸</div>
+                        <div>平均: 6.85 噸</div>
+                        <div>最高: 15.2 噸</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Mock table data
+        await this.loadMockTableData(filters, page);
+    }
+
+    async loadMockComparisonData(filters, page = 1) {
+        // Mock comparison stats
+        const statsElement = document.getElementById('statsCards');
+        if (statsElement) {
+            const statsHTML = Object.keys(this.tsConfig)
+                .filter(ts => !this.tsConfig[ts].isAdmin)
+                .map(tsCode => {
+                    const config = this.tsConfig[tsCode];
+                    const totalTransactions = Math.floor(Math.random() * 2000) + 500;
+                    const totalWeight = Math.floor(Math.random() * 15000) + 5000;
+                    const avgWeight = (totalWeight / totalTransactions).toFixed(2);
+                    const maxWeight = (Math.random() * 20 + 10).toFixed(1);
+                    
+                    return `
+                        <div class="stat-card ${tsCode.toLowerCase()}">
+                            <div class="stat-header">
+                                <span class="ts-color" style="background-color: ${config.color}"></span>
+                                <h3>${config.name}</h3>
+                            </div>
+                            <div class="stat-value">${totalTransactions.toLocaleString()}</div>
+                            <div class="stat-label">總交易數</div>
+                            <div class="stat-secondary">
+                                <div>總重量: ${totalWeight.toLocaleString()} 噸</div>
+                                <div>平均: ${avgWeight} 噸</div>
+                                <div>最高: ${maxWeight} 噸</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            statsElement.innerHTML = statsHTML;
+        }
+        
+        // Mock comparison table
+        await this.loadMockComparisonTable(filters, page);
+    }
+
+    async loadMockTableData(filters, page = 1) {
+        const tableBody = document.getElementById('dataTable');
+        if (!tableBody) return;
+        
+        const mockData = Array.from({ length: 10 }, (_, i) => ({
+            TS_Name: this.tsConfig[this.selectedTS]?.name || this.selectedTS,
+            日期: `2024-${String(page).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+            交收狀態: ['已完成', '進行中', '已取消'][i % 3],
+            車輛任務: ['收集', '轉運', '處理'][i % 3],
+            入磅時間: `08:${String(i * 5).padStart(2, '0')}`,
+            物料重量: (Math.random() * 10 + 5).toFixed(1),
+            廢物類別: ['P01.00', 'P05.00', 'D01.00'][i % 3],
+            來源: ['葵青區', '深水埗區', '灣仔區', '荃灣區', '觀塘區'][i % 5]
+        }));
+        
+        const tableHTML = mockData.map(record => `
+            <tr>
+                <td>${record.TS_Name}</td>
+                <td>${record.日期}</td>
+                <td>${record.交收狀態}</td>
+                <td>${record.車輛任務}</td>
+                <td>${record.入磅時間}</td>
+                <td>${record.物料重量}</td>
+                <td>${record.廢物類別}</td>
+                <td>${record.來源}</td>
+            </tr>
+        `).join('');
+        
+        tableBody.innerHTML = tableHTML;
+        
+        this.setupPagination({
+            currentPage: page,
+            totalPages: 5,
+            totalRecords: 50,
+            pageSize: 10
+        }, filters);
+    }
+
+    async loadMockComparisonTable(filters, page = 1) {
+        const tableBody = document.getElementById('dataTable');
+        if (!tableBody) return;
+        
+        const stations = Object.keys(this.tsConfig).filter(ts => !this.tsConfig[ts].isAdmin);
+        const mockData = Array.from({ length: 10 }, (_, i) => {
+            const randomTS = stations[Math.floor(Math.random() * stations.length)];
+            return {
+                TS_Name: this.tsConfig[randomTS].name,
+                日期: `2024-${String(page).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+                交收狀態: ['已完成', '進行中', '已取消'][i % 3],
+                車輛任務: ['收集', '轉運', '處理'][i % 3],
+                入磅時間: `08:${String(i * 5).padStart(2, '0')}`,
+                物料重量: (Math.random() * 10 + 5).toFixed(1),
+                廢物類別: ['P01.00', 'P05.00', 'D01.00'][i % 3],
+                來源: ['葵青區', '深水埗區', '灣仔區', '荃灣區', '觀塘區'][i % 5]
+            };
+        });
+        
+        const tableHTML = mockData.map(record => `
+            <tr>
+                <td>${record.TS_Name}</td>
+                <td>${record.日期}</td>
+                <td>${record.交收狀態}</td>
+                <td>${record.車輛任務}</td>
+                <td>${record.入磅時間}</td>
+                <td>${record.物料重量}</td>
+                <td>${record.廢物類別}</td>
+                <td>${record.來源}</td>
+            </tr>
+        `).join('');
+        
+        tableBody.innerHTML = tableHTML;
+        
+        this.setupPagination({
+            currentPage: page,
+            totalPages: 5,
+            totalRecords: 50,
+            pageSize: 10
+        }, filters);
+    }
+    
+    setupPagination(pagination, filters) {
+        const infoElement = document.getElementById('paginationInfo');
+        const controlsElement = document.getElementById('paginationControls');
+        
+        if (infoElement) {
+            const startRecord = ((pagination.currentPage - 1) * pagination.pageSize) + 1;
+            const endRecord = Math.min(pagination.currentPage * pagination.pageSize, pagination.totalRecords);
+            infoElement.textContent = `顯示 ${startRecord}-${endRecord} 條，共 ${pagination.totalRecords.toLocaleString()} 條記錄`;
+        }
+        
+        if (controlsElement) {
+            let controlsHTML = '';
             
-            console.log('✅ API login successful:', {
-                user: result.user,
-                fullName: result.fullName,
-                isAdmin: result.isAdmin
+            if (pagination.currentPage > 1) {
+                controlsHTML += `<button class="pagination-btn" data-page="${pagination.currentPage - 1}">上一頁</button>`;
+            }
+            
+            controlsHTML += `<span class="pagination-info">第 ${pagination.currentPage} 頁，共 ${pagination.totalPages} 頁</span>`;
+            
+            if (pagination.currentPage < pagination.totalPages) {
+                controlsHTML += `<button class="pagination-btn" data-page="${pagination.currentPage + 1}">下一頁</button>`;
+            }
+            
+            controlsElement.innerHTML = controlsHTML;
+            
+            controlsElement.querySelectorAll('.pagination-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const page = parseInt(e.target.getAttribute('data-page'));
+                    if (this.selectedTS === 'comparison') {
+                        this.loadComparisonData(filters, page);
+                    } else {
+                        this.loadSingleTSData(filters, page);
+                    }
+                });
+            });
+        }
+    }
+    
+    exportCSV() {
+        if (!this.selectedTS) {
+            this.showError('請先選擇轉運站或比較模式');
+            return;
+        }
+        
+        try {
+            const table = document.getElementById('dataTable');
+            if (!table) {
+                this.showError('沒有數據可導出');
+                return;
+            }
+            
+            const rows = table.querySelectorAll('tr');
+            if (rows.length === 0) {
+                this.showError('沒有數據可導出');
+                return;
+            }
+            
+            const headers = ['轉運站', '日期', '交收狀態', '車輛任務', '入磅時間', '物料重量 (噸)', '廢物類別', '來源'];
+            let csvContent = headers.join(',') + '\n';
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const rowData = Array.from(cells).map(cell => {
+                        let cellText = cell.textContent.trim();
+                        if (cellText.includes(',') || cellText.includes('"') || cellText.includes('\n')) {
+                            cellText = '"' + cellText.replace(/"/g, '""') + '"';
+                        }
+                        return cellText;
+                    });
+                    csvContent += rowData.join(',') + '\n';
+                }
             });
             
-            // Redirect to dashboard
-            window.location.href = 'dashboard.html';
-        } else {
-            throw new Error(result.error || '登入失敗：無效的憑證');
+            const filename = this.selectedTS === 'comparison' 
+                ? `轉運站比較數據_${new Date().toISOString().split('T')[0]}.csv`
+                : `${this.selectedTS}_數據_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            console.log('CSV exported:', filename);
+            
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showError('導出失敗: ' + error.message);
         }
-    } catch (error) {
-        console.error('❌ API authentication error:', error);
-        if (error.name === 'AbortError') {
-            throw new Error('連接超時，請檢查網絡連接');
-        } else if (error.message.includes('Failed to fetch')) {
-            throw new Error('無法連接到伺服器。請檢查：\n1. 網絡連接\n2. Google Apps Script 是否已部署\n3. 瀏覽器是否阻止了請求');
-        } else {
-            throw new Error('登入失敗: ' + error.message);
+    }
+
+    showLoading(show) {
+        let loader = document.getElementById('loadingIndicator');
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'loadingIndicator';
+            loader.className = 'global-loader hidden';
+            loader.innerHTML = `
+                <div class="loader-content">
+                    <div class="spinner"></div>
+                    <p>加載數據中...</p>
+                    <small>一年數據可能需要 10-15 秒</small>
+                </div>
+            `;
+            document.body.appendChild(loader);
         }
+        loader.classList.toggle('hidden', !show);
+    }
+
+    showSkeletonUI() {
+        const statsCards = document.getElementById('statsCards');
+        const dataTable = document.getElementById('dataTable');
+        
+        if (statsCards) statsCards.innerHTML = '<div class="stat-skeleton"></div>';
+        if (dataTable) dataTable.innerHTML = '<tr><td colspan="8"><div class="skeleton-cell"></div></td></tr>';
+    }
+    
+    showError(message) {
+        console.error('Error:', message);
+        alert('錯誤: ' + message);
+    }
+
+    setupComparisonFilters() {
+        console.log('Comparison filters setup for admin');
+    }
+
+    initMobileNavigation() {
+        // Mobile navigation can be added later
+        console.log('Mobile navigation placeholder');
+    }
+    
+    logout() {
+        console.log('Logout initiated by user:', this.currentUser);
+        
+        // Clear all user data from localStorage
+        localStorage.removeItem('ts_user');
+        localStorage.removeItem('ts_fullname');
+        localStorage.removeItem('ts_isAdmin');
+        
+        console.log('LocalStorage cleared, redirecting to login page...');
+        
+        // Redirect to login page
+        window.location.href = 'index.html';
     }
 }
 
-async function sha256(message) {
-    // Simple SHA-256 implementation
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Utility function to test API connection
-async function testAPIConnection() {
-    console.log('🧪 Testing API connection...');
-    try {
-        const response = await fetch(API_URL + '?action=test');
-        console.log('API test response:', response);
-        return response.ok;
-    } catch (error) {
-        console.error('API test failed:', error);
-        return false;
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing dashboard...');
+    
+    const currentUser = localStorage.getItem('ts_user');
+    console.log('Current user from localStorage:', currentUser);
+    
+    if (!currentUser) {
+        console.error('No user found in localStorage, redirecting to login...');
+        window.location.href = 'index.html';
+        return;
     }
-}
-
-// Clear authentication data
-function clearAuth() {
-    localStorage.removeItem('ts_user');
-    localStorage.removeItem('ts_fullname');
-    localStorage.removeItem('ts_isAdmin');
-    console.log('🧹 Authentication data cleared');
-    window.location.href = 'index.html';
-}
-
-// Add this to test the API on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Test API connection when page loads
-    setTimeout(() => {
-        testAPIConnection().then(success => {
-            if (!success) {
-                console.warn('⚠️ API connection test failed - using demo mode');
-            }
-        });
-    }, 1000);
+    
+    console.log('Creating dashboard instance...');
+    window.dashboard = new Dashboard();
 });
