@@ -1,4 +1,4 @@
-// dashboard.js - Complete Revised Version with All Methods
+// dashboard.js - Complete Revised & Fixed Version
 const API_BASE = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -15,22 +15,22 @@ class Dashboard {
         this.selectedTS = null;
         this.selectedWasteCategories = [];
         this.selectedSourceRegions = [];
-        
+
         console.log('Dashboard initialized:', {
             user: this.currentUser,
             fullName: this.userFullName,
             isAdmin: this.isAdmin
         });
-        
+
         if (!this.currentUser) {
             console.error('No user found, redirecting to login...');
             window.location.href = 'index.html';
             return;
         }
-        
+
         this.init();
     }
-    
+
     async init() {
         try {
             console.log('Starting dashboard initialization...');
@@ -39,13 +39,13 @@ class Dashboard {
             this.setupUI();
             this.setupEventListeners();
             this.loadNavigation();
-            
+
             if (this.isAdmin) {
                 this.setupComparisonFilters();
             }
-            
+
             this.autoSelectStation();
-            
+
             console.log('Dashboard initialization complete');
         } catch (error) {
             console.error('Dashboard initialization failed:', error);
@@ -53,53 +53,86 @@ class Dashboard {
         }
     }
 
-    // JSONP method to bypass CORS
+    // === 關鍵修復：JSONP 函數 ===
     jsonp(url) {
         return new Promise((resolve, reject) => {
             const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-            window[callbackName] = function(data) {
+            const script = document.createElement('script');
+            const cleanup = () => {
                 delete window[callbackName];
-                document.body.removeChild(script);
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                }
+            };
+
+            // 成功回呼
+            window[callbackName] = (data) => {
+                cleanup();
                 resolve(data);
             };
 
-            const script = document.createElement('script');
-            script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
+            // 錯誤處理
             script.onerror = () => {
-                delete window[callbackName];
-                document.body.removeChild(script);
-                reject(new Error('JSONP request failed'));
+                cleanup();
+                reject(new Error('JSONP request failed - network or script error'));
             };
+
+            // 防呆：callback 沒被呼叫
+            script.onload = () => {
+                setTimeout(() => {
+                    if (window[callbackName]) {
+                        cleanup();
+                        reject(new Error('JSONP timeout - callback not fired'));
+                    }
+                }, 100);
+            };
+
+            // 加上 callback 參數
+            const separator = url.includes('?') ? '&' : '?';
+            script.src = url + separator + 'callback=' + callbackName;
+
+            // 10 秒 timeout
+            const timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('JSONP request timeout after 10s'));
+            }, 10000);
+
+            // 插入 DOM
             document.body.appendChild(script);
+
+            // 成功時清除 timeout
+            const originalCallback = window[callbackName];
+            window[callbackName] = (...args) => {
+                clearTimeout(timeout);
+                originalCallback(...args);
+            };
         });
     }
 
     async fetchFromAPI(endpoint, params = {}) {
         try {
             console.log(`Fetching from API: ${endpoint}`, params);
-            
+
             const url = new URL(API_BASE);
             Object.keys(params).forEach(key => {
                 if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
                     url.searchParams.append(key, params[key]);
                 }
             });
-            
-            // Add user parameter to all requests
+
             if (this.currentUser) {
                 url.searchParams.append('user', this.currentUser);
             }
-            
+
             console.log('Fetching URL:', url.toString());
-            
-            // Use JSONP to bypass CORS
+
             const data = await this.jsonp(url.toString());
             console.log(`API response from ${endpoint}:`, data);
-            
+
             if (data.error) {
                 throw new Error(data.error);
             }
-            
+
             return data;
         } catch (error) {
             console.error(`API fetch error for ${endpoint}:`, error);
@@ -107,19 +140,18 @@ class Dashboard {
         }
     }
 
+    // === 其餘方法保持不變，但加強錯誤處理 ===
     async fetchData(filters = {}, page = 1) {
         const params = {
             action: 'getData',
             page: page.toString(),
             pageSize: this.pageSize.toString()
         };
-        
-        // Add station filter
+
         if (this.selectedTS && this.selectedTS !== 'comparison') {
             params.station = this.selectedTS;
         }
-        
-        // Add date filters
+
         if (filters.dateRange) {
             if (filters.dateRange.type === 'custom' && filters.dateRange.startDate && filters.dateRange.endDate) {
                 params.startDate = filters.dateRange.startDate;
@@ -130,18 +162,15 @@ class Dashboard {
                 params.dateRange = filters.dateRange.type;
             }
         }
-        
-        // Add waste category filters (multiple selection)
+
         if (filters.wasteCategories && filters.wasteCategories.length > 0) {
             params.wasteCategories = filters.wasteCategories.join(',');
         }
-        
-        // Add source region filters (multiple selection)
+
         if (filters.sourceRegions && filters.sourceRegions.length > 0) {
             params.sourceRegions = filters.sourceRegions.join(',');
         }
-        
-        console.log('Fetching data with params:', params);
+
         return await this.fetchFromAPI('', params);
     }
 
@@ -151,8 +180,7 @@ class Dashboard {
             page: page.toString(),
             pageSize: this.pageSize.toString()
         };
-        
-        // Add date filters for comparison
+
         if (filters.dateRange) {
             if (filters.dateRange.type === 'custom' && filters.dateRange.startDate && filters.dateRange.endDate) {
                 params.startDate = filters.dateRange.startDate;
@@ -163,36 +191,33 @@ class Dashboard {
                 params.dateRange = filters.dateRange.type;
             }
         }
-        
-        // Add waste category filters (multiple selection)
+
         if (filters.wasteCategories && filters.wasteCategories.length > 0) {
             params.wasteCategories = filters.wasteCategories.join(',');
         }
-        
-        // Add source region filters (multiple selection)
+
         if (filters.sourceRegions && filters.sourceRegions.length > 0) {
             params.sourceRegions = filters.sourceRegions.join(',');
         }
-        
-        console.log('Fetching comparison data with params:', params);
+
         return await this.fetchFromAPI('', params);
     }
-    
+
     autoSelectStation() {
         if (!this.isAdmin && this.currentUser) {
             this.selectedTS = this.currentUser;
             console.log('Auto-selecting station for regular user:', this.selectedTS);
-            this.showFilterPanel();
+            setTimeout(() => this.showFilterPanel(), 100); // 確保 DOM 就緒
         } else if (this.isAdmin) {
             console.log('Admin user - waiting for manual station selection');
         }
     }
-    
+
     async loadTSConfig() {
         try {
             console.log('Loading TS configuration from API...');
             const data = await this.fetchFromAPI('', { action: 'getStations' });
-            
+
             if (data && data.stations) {
                 this.tsConfig = data.stations;
                 console.log('TS Config loaded successfully from API:', this.tsConfig);
@@ -201,7 +226,6 @@ class Dashboard {
             }
         } catch (error) {
             console.error('Error loading TS config from API:', error);
-            // Use minimal fallback config for navigation
             this.tsConfig = {
                 'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
                 'IWTS': { name: '港島西轉運站', color: '#4ECDC4', isAdmin: false },
@@ -682,26 +706,25 @@ class Dashboard {
         console.log('Comparison link added to admin section');
     }
 
-    async selectTS(tsCode) {
+    selectTS(tsCode) {
         console.log('Selecting station:', tsCode);
-        
-        // Remove active class from all links
+
         document.querySelectorAll('#sidebarNav .nav-link').forEach(link => {
             link.classList.remove('active');
         });
-        
-        // Add active class to clicked link
-        event.target.closest('.nav-link').classList.add('active');
-        
+
+        // 修正：使用 event 從 click 傳入，或用 this
+        const activeLink = document.querySelector(`#sidebarNav .nav-link[data-ts="${tsCode}"]`) ||
+                          event?.target?.closest('.nav-link');
+        if (activeLink) activeLink.classList.add('active');
+
         this.selectedTS = tsCode;
         this.showFilterPanel();
-        
-        console.log('Loading data for station:', tsCode);
-        
+
         if (tsCode === 'comparison') {
-            await this.loadComparisonData(this.getCurrentFilters());
+            this.loadComparisonData(this.getCurrentFilters());
         } else {
-            await this.loadSingleTSData(this.getCurrentFilters());
+            this.loadSingleTSData(this.getCurrentFilters());
         }
     }
     
@@ -1041,16 +1064,11 @@ class Dashboard {
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing dashboard...');
-    
     const currentUser = localStorage.getItem('ts_user');
-    console.log('Current user from localStorage:', currentUser);
-    
     if (!currentUser) {
-        console.error('No user found in localStorage, redirecting to login...');
         window.location.href = 'index.html';
         return;
     }
-    
-    console.log('Creating dashboard instance...');
     window.dashboard = new Dashboard();
 });
+
