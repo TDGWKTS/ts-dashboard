@@ -1,99 +1,150 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transfer Station Dashboard - Login</title>
-    <link rel="stylesheet" href="base.css">
-    <link rel="stylesheet" href="layout.css">
-    <link rel="stylesheet" href="login.css">
-    <link rel="icon" href="my-logo.png">
-    <style>
-        .error-message {
-            background: #fee;
-            border: 1px solid #fcc;
-            color: #c00;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
+/* login.css */
+.login-page {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
 
-        .password-input-container {
-            position: relative;
-        }
+.login-container {
+    background: white;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+}
 
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            padding: 5px;
-        }
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
 
-        .btn-loading {
-            display: none;
-        }
+.logo-text {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
 
-        .hidden {
-            display: none !important;
-        }
+.login-header h1 {
+    margin: 10px 0 5px 0;
+    color: #333;
+    font-size: 24px;
+}
 
-        .login-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-    </style>
-</head>
-<body class="login-page">
-    <div class="login-container">
-        <div class="login-header">
-            <div class="logo-text">🏭 TS Dashboard</div>
-            <h1>轉運站數據儀表板</h1>
-            <p>Transfer Station Dashboard</p>
-        </div>
-        
-        <!-- Error Message Display -->
-        <div id="errorMessage" class="error-message hidden"></div>
-        
-        <form id="loginForm" class="login-form">
-            <div class="form-group">
-                <label for="username">轉運站:</label>
-                <select id="username" required>
-                    <option value="">選擇您的轉運站</option>
-                    <option value="IETS">IETS - 港島東轉運站</option>
-                    <option value="IWTS">IWTS - 港島西轉運站</option>
-                    <option value="NLTS">NLTS - 北大嶼山轉運站</option>
-                    <option value="NWNNTS">NWNNTS - 西北新界轉運站</option>
-                    <option value="OITF">OITF - 離島轉運設施</option>
-                    <option value="STTS">STTS - 沙田轉運站</option>
-                    <option value="WKTS">WKTS - 西九龍轉運站 (管理員)</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="password">密碼:</label>
-                <div class="password-input-container">
-                    <input type="password" id="password" required placeholder="輸入您的密碼">
-                    <button type="button" id="togglePassword" class="password-toggle">👁️</button>
-                </div>
-            </div>
-            
-            <button type="submit" class="login-btn" id="loginButton">
-                <span class="btn-text">登入儀表板</span>
-                <span class="btn-loading hidden">登入中...</span>
-            </button>
-        </form>
-        
-        <div class="login-footer">
-            <p>香港轉運站管理系統 © 2024</p>
-        </div>
-    </div>
+.login-header p {
+    color: #666;
+    margin: 0;
+}
 
-    <script src="auth.js"></script>
-</body>
-</html>
+.login-form {
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+    font-weight: 500;
+}
+
+.form-group select,
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.form-group select:focus,
+.form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.login-btn:hover {
+    background: #5a6fd8;
+}
+
+.login-footer {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+}
+
+/* Error message styles */
+.error-message {
+    background: #fee;
+    border: 1px solid #fcc;
+    color: #c00;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.password-input-container {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 5px;
+}
+
+.btn-loading {
+    display: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+    .login-container {
+        padding: 30px 20px;
+        margin: 10px;
+    }
+    
+    .login-header h1 {
+        font-size: 20px;
+    }
+    
+    .logo-text {
+        font-size: 20px;
+    }
+}
