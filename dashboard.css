@@ -1,4 +1,4 @@
-﻿.welcome-page {
+.welcome-page {
     height: 100%;
     display: flex;
     align-items: center;
@@ -132,8 +132,6 @@
     border: 1px solid #ddd;
     border-radius: 8px;
     background: white;
-    max-height: 300px;
-    overflow-y: auto;
     padding: 10px;
 }
 
@@ -177,8 +175,7 @@
 }
 
 .checkbox-options {
-    max-height: 200px;
-    overflow-y: auto;
+    /* No height restrictions - will expand naturally */
 }
 
 .checkbox-option {
@@ -203,18 +200,6 @@
 
 .option-text {
     flex: 1;
-}
-
-.all-option {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-    font-weight: 600;
-}
-
-.all-option .option-text {
-    color: #007bff;
-    font-weight: 600;
 }
 
 .selected-count {
@@ -260,22 +245,6 @@
 
 .checkbox-option input[type="checkbox"]:checked::before {
     content: '✓';
-    position: absolute;
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.checkbox-option input[type="checkbox"]:indeterminate {
-    background-color: #007bff;
-    border-color: #007bff;
-}
-
-.checkbox-option input[type="checkbox"]:indeterminate::before {
-    content: '–';
     position: absolute;
     color: white;
     font-size: 12px;
@@ -335,5 +304,3 @@
     }
 
 }
-
-
