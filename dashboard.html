@@ -101,20 +101,22 @@
             <input type="date" id="specificDate" class="date-input">
         </div>
         
+        <!-- Updated Waste Category Filter with Checkboxes -->
         <div class="filter-group">
-            <label>廢物類別:</label>
-            <select id="wasteCategoryFilter">
-                <option value="">所有類別</option>
-                <!-- Dynamic options will be loaded here -->
-            </select>
+            <label class="filter-label">廢物類別</label>
+            <div id="wasteCategoryFilter" class="checkbox-filter-container">
+                <!-- Checkbox options will be populated by JavaScript -->
+            </div>
         </div>
+        
+        <!-- Updated Source Region Filter with Checkboxes -->
         <div class="filter-group">
-            <label>來源地區:</label>
-            <select id="sourceFilter">
-                <option value="">所有地區</option>
-                <!-- Dynamic options will be loaded here -->
-            </select>
+            <label class="filter-label">來源地區</label>
+            <div id="sourceFilter" class="checkbox-filter-container">
+                <!-- Checkbox options will be populated by JavaScript -->
+            </div>
         </div>
+        
         <button id="applyFilters" class="filter-btn">應用篩選</button>
         <button id="compareBtn" class="filter-btn secondary hidden">比較所有轉運站</button>
     </div>
@@ -218,5 +220,6 @@
     </script>
 </body>
 </html>
+
 
 
