@@ -59,10 +59,12 @@ class Dashboard {
             
             const url = new URL(API_URL);
             Object.keys(params).forEach(key => {
-                if (params[key]) {
+                if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
                     url.searchParams.append(key, params[key]);
                 }
             });
+            
+            console.log('Fetching URL:', url.toString());
             
             const response = await fetch(url.toString(), {
                 method: 'GET',
@@ -123,6 +125,7 @@ class Dashboard {
             params.sourceRegions = filters.sourceRegions.join(',');
         }
         
+        console.log('Fetching data with params:', params);
         return await this.fetchFromAPI('', params);
     }
 
@@ -155,6 +158,7 @@ class Dashboard {
             params.sourceRegions = filters.sourceRegions.join(',');
         }
         
+        console.log('Fetching comparison data with params:', params);
         return await this.fetchFromAPI('', params);
     }
     
@@ -198,7 +202,7 @@ class Dashboard {
         try {
             console.log('Loading dynamic filters from GAS API...');
             
-            // Fetch filter options from Google Apps Script
+            // Try to get real filter data from API
             const filterData = await this.fetchFromAPI('', { 
                 action: 'getFilterOptions' 
             });
@@ -206,66 +210,50 @@ class Dashboard {
             console.log('Raw filter data from GAS:', filterData);
             
             if (filterData && (filterData.wasteCategories || filterData.sourceRegions)) {
+                console.log('Using real filter data from API');
                 this.populateDynamicFilters(filterData);
-                console.log('Dynamic filters loaded successfully from GAS');
             } else {
-                // If the API doesn't return the expected structure, try alternative approaches
-                await this.loadFilterDataAlternative();
+                console.log('No filter data from API, using mock data');
+                // Use mock data as fallback
+                const mockFilterData = {
+                    wasteCategories: [
+                        'P01.00 - 都市固體廢物',
+                        'P05.00 - 建築廢料', 
+                        'D01.00 - 危險廢物',
+                        'C01.00 - 商業廢物',
+                        'C02.00 - 工業廢物',
+                        'M01.00 - 混合廢物'
+                    ],
+                    sourceRegions: [
+                        '中西區', '灣仔區', '東區', '南區',
+                        '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
+                        '葵青區', '荃灣區', '屯門區', '元朗區'
+                    ]
+                };
+                this.populateDynamicFilters(mockFilterData);
             }
             
         } catch (error) {
             console.error('Error loading dynamic filters from GAS:', error);
-            await this.loadFilterDataAlternative();
+            // Fallback to mock data
+            console.log('Using fallback mock filter data due to error');
+            const mockFilterData = {
+                wasteCategories: [
+                    'P01.00 - 都市固體廢物',
+                    'P05.00 - 建築廢料', 
+                    'D01.00 - 危險廢物',
+                    'C01.00 - 商業廢物',
+                    'C02.00 - 工業廢物',
+                    'M01.00 - 混合廢物'
+                ],
+                sourceRegions: [
+                    '中西區', '灣仔區', '東區', '南區',
+                    '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
+                    '葵青區', '荃灣區', '屯門區', '元朗區'
+                ]
+            };
+            this.populateDynamicFilters(mockFilterData);
         }
-    }
-
-    async loadFilterDataAlternative() {
-        try {
-            console.log('Trying alternative approach to load filters...');
-            
-            // Alternative 1: Get filters from the main data endpoint
-            const data = await this.fetchFromAPI('', { 
-                action: 'getData',
-                limit: 1 // Just get one record to extract unique values
-            });
-            
-            if (data && data.records && data.records.length > 0) {
-                // Extract unique values from the sample data
-                const wasteCategories = [...new Set(data.records.map(item => item.廢物類別 || item.wasteCategory).filter(Boolean))];
-                const sourceRegions = [...new Set(data.records.map(item => item.來源 || item.sourceRegion).filter(Boolean))];
-                
-                const filterData = {
-                    wasteCategories: wasteCategories,
-                    sourceRegions: sourceRegions
-                };
-                
-                this.populateDynamicFilters(filterData);
-                console.log('Filters loaded from sample data:', filterData);
-                return;
-            }
-        } catch (error) {
-            console.error('Alternative approach failed:', error);
-        }
-        
-        // Final fallback to mock data
-        console.log('Using fallback mock filter data');
-        const demoFilterData = {
-            wasteCategories: [
-                'P01.00 - 都市固體廢物',
-                'P05.00 - 建築廢料', 
-                'D01.00 - 危險廢物',
-                'C01.00 - 商業廢物',
-                'C02.00 - 工業廢物',
-                'M01.00 - 混合廢物'
-            ],
-            sourceRegions: [
-                '中西區', '灣仔區', '東區', '南區',
-                '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
-                '葵青區', '荃灣區', '屯門區', '元朗區'
-            ]
-        };
-        
-        this.populateDynamicFilters(demoFilterData);
     }
 
     populateDynamicFilters(data) {
@@ -297,8 +285,10 @@ class Dashboard {
             <div class="checkbox-filter-container">
                 <div class="filter-header">
                     <h4>${filterName}</h4>
-                    <button type="button" class="select-all-btn" data-filter="${containerId}">全選</button>
-                    <button type="button" class="clear-all-btn" data-filter="${containerId}">清除</button>
+                    <div class="filter-buttons">
+                        <button type="button" class="select-all-btn" data-filter="${containerId}">全選</button>
+                        <button type="button" class="clear-all-btn" data-filter="${containerId}">清除</button>
+                    </div>
                 </div>
                 <div class="checkbox-options">
                     <div class="checkbox-option all-option">
@@ -348,6 +338,7 @@ class Dashboard {
                 checkbox.checked = true;
             });
             selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
             this.updateFilterSelection(containerId);
         });
 
@@ -357,6 +348,7 @@ class Dashboard {
                 checkbox.checked = false;
             });
             selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
             this.updateFilterSelection(containerId);
         });
 
@@ -365,6 +357,7 @@ class Dashboard {
             individualCheckboxes.forEach(checkbox => {
                 checkbox.checked = e.target.checked;
             });
+            selectAllCheckbox.indeterminate = false;
             this.updateFilterSelection(containerId);
         });
 
@@ -374,10 +367,15 @@ class Dashboard {
                 this.updateFilterSelection(containerId);
             });
         });
+
+        // Initialize the selection state
+        this.updateFilterSelection(containerId);
     }
 
     updateFilterSelection(containerId) {
         const container = document.getElementById(containerId);
+        if (!container) return;
+        
         const individualCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-checkbox)');
         const selectAllCheckbox = container.querySelector('.select-all-checkbox');
         const totalOptions = individualCheckboxes.length;
@@ -971,7 +969,6 @@ class Dashboard {
         }, filters);
     }
 
-    // Keep mock data methods as fallback
     async loadMockSingleTSData(filters, page = 1) {
         // Mock stats data
         const statsElement = document.getElementById('statsCards');
