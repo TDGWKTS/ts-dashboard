@@ -1,7 +1,17 @@
-[build]
-  publish = "."
+[[redirects]]
+  from = "/dashboard"
+  to = "/dashboard.html"
+  status = 200
+  force = false
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Protect dashboard routes
+[[headers]]
+  for = "/dashboard.html"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
