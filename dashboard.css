@@ -103,6 +103,49 @@
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
 }
+/* Date input styles */
+.date-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.custom-date-range,
+.specific-date {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.custom-date-range.hidden,
+.specific-date.hidden {
+    display: none;
+}
+
+.filter-group span {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Responsive design for filters */
+@media (max-width: 768px) {
+    .filter-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .custom-date-range,
+    .specific-date {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .date-input {
+        width: 100%;
+    }
+}
+
 
 @media (max-width: 768px) {
     .welcome-page {
@@ -124,3 +167,4 @@
     }
 
 }
+
