@@ -88,8 +88,8 @@ class Dashboard {
 
             const timeout = setTimeout(() => {
                 cleanup();
-                reject(new Error('JSONP request timeout after 10s'));
-            }, 10000);
+                reject(new Error('JSONP request timeout after 30s'));
+            }, 30000);
 
             document.body.appendChild(script);
 
@@ -1054,4 +1054,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.dashboard = new Dashboard();
 });
+
 
