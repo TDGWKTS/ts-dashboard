@@ -1,4 +1,4 @@
-// dashboard.js - Complete Revised & Fixed Version
+// dashboard.js - Real Data Only Version
 const API_BASE = 'https://script.google.com/macros/s/AKfycbyyhHqT2ALVydXLmgynvr6GSJfyWmhIDWNSMkkWrctJZdICgMvbjE5h25WFEQiWCVk/exec';
 
 class Dashboard {
@@ -53,7 +53,6 @@ class Dashboard {
         }
     }
 
-    // === 關鍵修復：JSONP 函數 ===
     jsonp(url) {
         return new Promise((resolve, reject) => {
             const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
@@ -65,19 +64,16 @@ class Dashboard {
                 }
             };
 
-            // 成功回呼
             window[callbackName] = (data) => {
                 cleanup();
                 resolve(data);
             };
 
-            // 錯誤處理
             script.onerror = () => {
                 cleanup();
                 reject(new Error('JSONP request failed - network or script error'));
             };
 
-            // 防呆：callback 沒被呼叫
             script.onload = () => {
                 setTimeout(() => {
                     if (window[callbackName]) {
@@ -87,20 +83,16 @@ class Dashboard {
                 }, 100);
             };
 
-            // 加上 callback 參數
             const separator = url.includes('?') ? '&' : '?';
             script.src = url + separator + 'callback=' + callbackName;
 
-            // 10 秒 timeout
             const timeout = setTimeout(() => {
                 cleanup();
                 reject(new Error('JSONP request timeout after 10s'));
             }, 10000);
 
-            // 插入 DOM
             document.body.appendChild(script);
 
-            // 成功時清除 timeout
             const originalCallback = window[callbackName];
             window[callbackName] = (...args) => {
                 clearTimeout(timeout);
@@ -140,7 +132,6 @@ class Dashboard {
         }
     }
 
-    // === 其餘方法保持不變，但加強錯誤處理 ===
     async fetchData(filters = {}, page = 1) {
         const params = {
             action: 'getData',
@@ -207,7 +198,7 @@ class Dashboard {
         if (!this.isAdmin && this.currentUser) {
             this.selectedTS = this.currentUser;
             console.log('Auto-selecting station for regular user:', this.selectedTS);
-            setTimeout(() => this.showFilterPanel(), 100); // 確保 DOM 就緒
+            setTimeout(() => this.showFilterPanel(), 100);
         } else if (this.isAdmin) {
             console.log('Admin user - waiting for manual station selection');
         }
@@ -226,16 +217,7 @@ class Dashboard {
             }
         } catch (error) {
             console.error('Error loading TS config from API:', error);
-            this.tsConfig = {
-                'IETS': { name: '港島東轉運站', color: '#FF6B6B', isAdmin: false },
-                'IWTS': { name: '港島西轉運站', color: '#4ECDC4', isAdmin: false },
-                'NLTS': { name: '北大嶼山轉運站', color: '#45B7D1', isAdmin: false },
-                'NWNNTS': { name: '西北新界轉運站', color: '#96CEB4', isAdmin: false },
-                'OITF': { name: '離島轉運設施', color: '#FFEAA7', isAdmin: false },
-                'STTS': { name: '沙田轉運站', color: '#DDA0DD', isAdmin: false },
-                'WKTS': { name: '西九龍轉運站', color: '#98D8C8', isAdmin: true }
-            };
-            console.log('Using fallback TS config for navigation');
+            throw error; // Don't use fallback data
         }
     }
 
@@ -253,29 +235,31 @@ class Dashboard {
                 console.log('Using real filter data from API');
                 this.populateDynamicFilters(filterData);
             } else {
-                throw new Error('No filter data received from API');
+                console.warn('No filter data received from API, checking alternative structures');
+                
+                // Check if data is in different structure
+                if (filterData && Array.isArray(filterData)) {
+                    console.log('Data is array, checking structure:', filterData);
+                    const wasteCats = [...new Set(filterData.map(item => item.wasteCategory).filter(Boolean))];
+                    const regions = [...new Set(filterData.map(item => item.sourceRegion).filter(Boolean))];
+                    
+                    if (wasteCats.length > 0 || regions.length > 0) {
+                        const processedData = {
+                            wasteCategories: wasteCats,
+                            sourceRegions: regions
+                        };
+                        console.log('Processed data from array:', processedData);
+                        this.populateDynamicFilters(processedData);
+                        return;
+                    }
+                }
+                
+                throw new Error('No usable filter data received from API');
             }
             
         } catch (error) {
             console.error('Error loading dynamic filters from GAS:', error);
-            // Use sample data to ensure filters are visible
-            const sampleFilterData = {
-                wasteCategories: [
-                    'P01.00 - 都市固體廢物',
-                    'P05.00 - 建築廢料', 
-                    'D01.00 - 危險廢物',
-                    'C01.00 - 商業廢物',
-                    'C02.00 - 工業廢物',
-                    'M01.00 - 混合廢物'
-                ],
-                sourceRegions: [
-                    '中西區', '灣仔區', '東區', '南區',
-                    '油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區',
-                    '葵青區', '荃灣區', '屯門區', '元朗區'
-                ]
-            };
-            console.log('Using sample filter data due to API error');
-            this.populateDynamicFilters(sampleFilterData);
+            throw error; // Don't use sample data
         }
     }
 
@@ -603,6 +587,7 @@ class Dashboard {
             const link = document.createElement('a');
             link.href = '#';
             link.className = 'nav-link';
+            link.setAttribute('data-ts', tsCode);
             link.innerHTML = `
                 <span class="ts-color" style="background-color: ${config.color}"></span>
                 <span class="ts-info">
@@ -713,9 +698,7 @@ class Dashboard {
             link.classList.remove('active');
         });
 
-        // 修正：使用 event 從 click 傳入，或用 this
-        const activeLink = document.querySelector(`#sidebarNav .nav-link[data-ts="${tsCode}"]`) ||
-                          event?.target?.closest('.nav-link');
+        const activeLink = document.querySelector(`#sidebarNav .nav-link[data-ts="${tsCode}"]`);
         if (activeLink) activeLink.classList.add('active');
 
         this.selectedTS = tsCode;
@@ -1071,4 +1054,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.dashboard = new Dashboard();
 });
-
